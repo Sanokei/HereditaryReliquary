@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 26f3431df29433844b13ab01ac15b84f, type: 3}
+  m_Name: Slash
+  m_EditorClassIdentifier: Assembly-CSharp::Skill
+  skillName: 
+  description: 
+  skillType: 0
+  icon: {fileID: 0}
+  skillPointsRequired: 1
+  skillGraph: {fileID: 6977761567269433723}
+--- !u!114 &6977761567269433723
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 98db2a51de727f344a90ab762375a152, type: 3}
+  m_Name: _Graph
+  m_EditorClassIdentifier: Assembly-CSharp::SkillGraph
+  entryNodeId: c26806c9-4b6f-4c0d-a426-7e41519db73c

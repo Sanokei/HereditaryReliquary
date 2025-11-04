@@ -23,3 +23,8 @@ MonoBehaviour:
     position: {x: 655, y: 431}
     prerequisites:
     - 2b5ac564-ebcd-47bf-9df3-06d2594b7dea
+  - id: d73a2271-c9a3-4e3b-9f56-be9ab525385d
+    skill: {fileID: 0}
+    position: {x: 587, y: 262}
+    prerequisites:
+    - 2b5ac564-ebcd-47bf-9df3-06d2594b7dea

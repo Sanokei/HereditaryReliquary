@@ -1,8 +1,10 @@
 using UnityEngine;
 using UnityEditor;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 
 public class SkillGraphEditor : EditorWindow
 {
@@ -31,6 +33,9 @@ public class SkillGraphEditor : EditorWindow
     // Node creation
     private System.Type selectedNodeType;
     private Rect nodePaletteRect;
+
+    // Reflection constructor cache for dynamic node creation
+    private readonly Dictionary<Type, ConstructorInfo> nodeConstructorCache = new Dictionary<Type, ConstructorInfo>();
     
     [MenuItem("Tools/Skill Graph Editor")]
     public static void ShowWindow()
@@ -118,17 +123,7 @@ public class SkillGraphEditor : EditorWindow
         
         EditorGUILayout.EndHorizontal();
         
-        // Edit Skill Graph button at bottom
-        EditorGUILayout.BeginHorizontal();
-        GUILayout.FlexibleSpace();
-        if (GUILayout.Button("Edit Skill Graph", GUILayout.Width(150), GUILayout.Height(30)))
-        {
-            // Focus is already on the graph, but we can ensure the window is focused
-            Focus();
-        }
-        GUILayout.FlexibleSpace();
-        EditorGUILayout.EndHorizontal();
-        
+        // Mark assets as dirty when changed
         if (GUI.changed)
         {
             if (skillGraph != null)
@@ -139,6 +134,14 @@ public class SkillGraphEditor : EditorWindow
             {
                 EditorUtility.SetDirty(selectedSkill);
             }
+        }
+    }
+    
+    private void AutoSaveAssets()
+    {
+        if (selectedSkill != null && AssetDatabase.Contains(selectedSkill))
+        {
+            AssetDatabase.SaveAssets();
         }
     }
     
@@ -347,64 +350,8 @@ public class SkillGraphEditor : EditorWindow
     {
         if (skillGraph == null) return;
         
-        Vector2 newNodePos = Event.current.mousePosition - panOffset;
-        SkillGraphNode newNode = null;
-        
-        // Create instance based on type
-        if (nodeType == typeof(EntryNode))
-            newNode = new EntryNode(newNodePos);
-        else if (nodeType == typeof(SequenceNode))
-            newNode = new SequenceNode(newNodePos);
-        else if (nodeType == typeof(BranchNode))
-            newNode = new BranchNode(newNodePos);
-        else if (nodeType == typeof(LoopNode))
-            newNode = new LoopNode(newNodePos);
-        else if (nodeType == typeof(DelayNode))
-            newNode = new DelayNode(newNodePos);
-        else if (nodeType == typeof(ParallelNode))
-            newNode = new ParallelNode(newNodePos);
-        else if (nodeType == typeof(HealNode))
-            newNode = new HealNode(newNodePos);
-        else if (nodeType == typeof(DamageNode))
-            newNode = new DamageNode(newNodePos);
-        else if (nodeType == typeof(ApplyStatusNode))
-            newNode = new ApplyStatusNode(newNodePos);
-        else if (nodeType == typeof(MoveNode))
-            newNode = new MoveNode(newNodePos);
-        else if (nodeType == typeof(SpawnNode))
-            newNode = new SpawnNode(newNodePos);
-        else if (nodeType == typeof(TargetSelfNode))
-            newNode = new TargetSelfNode(newNodePos);
-        else if (nodeType == typeof(TargetEnemyNode))
-            newNode = new TargetEnemyNode(newNodePos);
-        else if (nodeType == typeof(TargetAllyNode))
-            newNode = new TargetAllyNode(newNodePos);
-        else if (nodeType == typeof(TargetAreaNode))
-            newNode = new TargetAreaNode(newNodePos);
-        else if (nodeType == typeof(TargetRaycastNode))
-            newNode = new TargetRaycastNode(newNodePos);
-        else if (nodeType == typeof(FilterTargetsNode))
-            newNode = new FilterTargetsNode(newNodePos);
-        else if (nodeType == typeof(PlayAnimationNode))
-            newNode = new PlayAnimationNode(newNodePos);
-        else if (nodeType == typeof(SpawnParticleNode))
-            newNode = new SpawnParticleNode(newNodePos);
-        else if (nodeType == typeof(PlaySoundNode))
-            newNode = new PlaySoundNode(newNodePos);
-        else if (nodeType == typeof(CameraShakeNode))
-            newNode = new CameraShakeNode(newNodePos);
-        else if (nodeType == typeof(ConstantNode))
-            newNode = new ConstantNode(newNodePos);
-        else if (nodeType == typeof(GetHealthNode))
-            newNode = new GetHealthNode(newNodePos);
-        else if (nodeType == typeof(GetPositionNode))
-            newNode = new GetPositionNode(newNodePos);
-        else if (nodeType == typeof(GetStatNode))
-            newNode = new GetStatNode(newNodePos);
-        else if (nodeType == typeof(CalculateNode))
-            newNode = new CalculateNode(newNodePos);
-        else if (nodeType == typeof(CompareNode))
-            newNode = new CompareNode(newNodePos);
+        Vector2 newNodePos = Event.current.mousePosition - panOffset + new Vector2(NODE_WIDTH * 0.6f, 0f);
+        SkillGraphNode newNode = InstantiateNode(nodeType, newNodePos);
         
         if (newNode != null)
         {
@@ -419,6 +366,7 @@ public class SkillGraphEditor : EditorWindow
             
             GUI.changed = true;
             Repaint();
+            AutoSaveAssets();
         }
     }
     
@@ -466,41 +414,53 @@ public class SkillGraphEditor : EditorWindow
     
     private void DrawNode(SkillGraphNode node)
     {
+        bool isEntryNode = node is EntryNode;
         Vector2 nodePos = node.Position + panOffset;
-        Rect nodeRect = new Rect(nodePos.x, nodePos.y, NODE_WIDTH, NODE_HEIGHT);
         
-        // Draw node background
-        Color backgroundColor = (node == selectedNode) ? new Color(0.3f, 0.5f, 0.8f, 0.8f) : new Color(0.2f, 0.2f, 0.2f, 0.8f);
-        EditorGUI.DrawRect(nodeRect, backgroundColor);
+        // Entry node is thinner
+        float nodeHeight = isEntryNode ? NODE_HEIGHT * 0.6f : NODE_HEIGHT;
+        Rect nodeRect = new Rect(nodePos.x, nodePos.y, NODE_WIDTH, nodeHeight);
         
-        // Draw node border
-        Handles.BeginGUI();
-        Handles.color = (node == selectedNode) ? Color.yellow : Color.white;
-        Handles.DrawAAPolyLine(3f, new Vector3[] {
-            new Vector3(nodeRect.x, nodeRect.y, 0),
-            new Vector3(nodeRect.x + nodeRect.width, nodeRect.y, 0),
-            new Vector3(nodeRect.x + nodeRect.width, nodeRect.y + nodeRect.height, 0),
-            new Vector3(nodeRect.x, nodeRect.y + nodeRect.height, 0),
-            new Vector3(nodeRect.x, nodeRect.y, 0)
-        });
-        Handles.EndGUI();
-        
-        // Draw node content with properties inside
-        GUILayout.BeginArea(nodeRect);
-        EditorGUILayout.BeginVertical();
-        
-        // Node title
-        EditorGUILayout.LabelField(node.Title, EditorStyles.boldLabel);
-        
-        // Draw node properties inside the node
-        DrawNodePropertiesInNode(node);
-        
-        EditorGUILayout.EndVertical();
-        GUILayout.EndArea();
+        if (isEntryNode)
+        {
+            // Draw special Entry node with rounded corners and green color
+            DrawEntryNode(nodeRect, node == selectedNode);
+        }
+        else
+        {
+            // Draw node background
+            Color backgroundColor = (node == selectedNode) ? new Color(0.3f, 0.5f, 0.8f, 0.8f) : new Color(0.2f, 0.2f, 0.2f, 0.8f);
+            EditorGUI.DrawRect(nodeRect, backgroundColor);
+            
+            // Draw node border
+            Handles.BeginGUI();
+            Handles.color = (node == selectedNode) ? Color.yellow : Color.white;
+            Handles.DrawAAPolyLine(3f, new Vector3[] {
+                new Vector3(nodeRect.x, nodeRect.y, 0),
+                new Vector3(nodeRect.x + nodeRect.width, nodeRect.y, 0),
+                new Vector3(nodeRect.x + nodeRect.width, nodeRect.y + nodeRect.height, 0),
+                new Vector3(nodeRect.x, nodeRect.y + nodeRect.height, 0),
+                new Vector3(nodeRect.x, nodeRect.y, 0)
+            });
+            Handles.EndGUI();
+            
+            // Draw node content with properties inside
+            GUILayout.BeginArea(nodeRect);
+            EditorGUILayout.BeginVertical();
+            
+            // Node title
+            EditorGUILayout.LabelField(node.Title, EditorStyles.boldLabel);
+            
+            // Draw node properties inside the node
+            DrawNodePropertiesInNode(node);
+            
+            EditorGUILayout.EndVertical();
+            GUILayout.EndArea();
+        }
         
         // Draw connection handles on the sides
-        Vector2 outputHandlePos = nodePos + new Vector2(NODE_WIDTH, NODE_HEIGHT / 2);
-        Vector2 inputHandlePos = nodePos + new Vector2(0, NODE_HEIGHT / 2);
+        Vector2 outputHandlePos = nodePos + new Vector2(NODE_WIDTH, nodeHeight / 2);
+        Vector2 inputHandlePos = nodePos + new Vector2(0, nodeHeight / 2);
         
         Rect outputHandleRect = new Rect(outputHandlePos.x - CONNECTION_HANDLE_SIZE / 2, 
                                         outputHandlePos.y - CONNECTION_HANDLE_SIZE / 2, 
@@ -518,12 +478,15 @@ public class SkillGraphEditor : EditorWindow
         Handles.color = Color.white;
         Handles.EndGUI();
         
-        // Draw input handle (left side) - red
-        Handles.BeginGUI();
-        Handles.color = Color.red;
-        Handles.DrawSolidDisc(inputHandlePos, Vector3.forward, CONNECTION_HANDLE_SIZE / 2);
-        Handles.color = Color.white;
-        Handles.EndGUI();
+        // Draw input handle (left side) - red (skip for Entry node)
+        if (!isEntryNode)
+        {
+            Handles.BeginGUI();
+            Handles.color = Color.red;
+            Handles.DrawSolidDisc(inputHandlePos, Vector3.forward, CONNECTION_HANDLE_SIZE / 2);
+            Handles.color = Color.white;
+            Handles.EndGUI();
+        }
         
         // Handle connection handle clicks
         if (Event.current.type == EventType.MouseDown && Event.current.button == 0)
@@ -551,9 +514,9 @@ public class SkillGraphEditor : EditorWindow
                     Event.current.Use();
                 }
             }
-            else if (inputHandleRect.Contains(Event.current.mousePosition) && connectingFromNode != null && connectingFromNode != node)
+            else if (!isEntryNode && inputHandleRect.Contains(Event.current.mousePosition) && connectingFromNode != null && connectingFromNode != node)
             {
-                // Complete connection to first execution input pin
+                // Complete connection to first execution input pin (Entry node has no input)
                 var inputPins = node.GetInputPins();
                 var execInputPins = inputPins.Where(p => p.Type == PinType.Execution).ToList();
                 if (execInputPins.Count > 0)
@@ -577,18 +540,29 @@ public class SkillGraphEditor : EditorWindow
         }
         
         // Handle node selection and dragging (single click to select)
-        if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && nodeRect.Contains(Event.current.mousePosition))
+        // Only start dragging when clicking the header area (title bar), not the property area
+        // and only when no GUI control has captured the event
+        Rect headerRect = new Rect(nodeRect.x, nodeRect.y, nodeRect.width, 24f);
+        if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && headerRect.Contains(Event.current.mousePosition) && GUIUtility.hotControl == 0 && !EditorGUIUtility.editingTextField)
         {
-            if (!outputHandleRect.Contains(Event.current.mousePosition) && !inputHandleRect.Contains(Event.current.mousePosition))
+            bool clickedOnHandle = outputHandleRect.Contains(Event.current.mousePosition);
+            if (!isEntryNode)
+            {
+                clickedOnHandle = clickedOnHandle || inputHandleRect.Contains(Event.current.mousePosition);
+            }
+            
+            if (!clickedOnHandle)
             {
                 selectedNode = node;
                 isDragging = true;
+                GUI.FocusControl(null);
+                GUIUtility.keyboardControl = 0;
                 lastMousePosition = Event.current.mousePosition;
                 Event.current.Use();
             }
         }
         
-        if (isDragging && selectedNode == node && !(node is EntryNode))
+        if (isDragging && selectedNode == node)
         {
             if (Event.current.type == EventType.MouseDrag)
             {
@@ -599,24 +573,120 @@ public class SkillGraphEditor : EditorWindow
                 Event.current.Use();
             }
         }
-        
-        // Prevent dragging entry node - keep it locked in center
-        if (node is EntryNode)
-        {
-            // Calculate center position relative to current view
-            float centerX = (position.width - (showNodePalette ? 250 : 0)) / 2 - NODE_WIDTH / 2;
-            float centerY = position.height / 2 - NODE_HEIGHT / 2;
-            Vector2 centerPos = new Vector2(centerX - panOffset.x, centerY - panOffset.y);
-            
-            if (Vector2.Distance(node.Position, centerPos) > 1f)
-            {
-                node.Position = centerPos;
-                GUI.changed = true;
-            }
-        }
     }
     
     // All old property drawer methods removed - they're now in DrawNodePropertiesInNode
+    
+    private void DrawEntryNode(Rect nodeRect, bool isSelected)
+    {
+        // Define green color scheme
+        Color mainGreen = new Color(0.2f, 0.7f, 0.3f, 1f);
+        Color borderColor = isSelected ? Color.yellow : new Color(0.1f, 0.5f, 0.2f, 1f);
+        
+        // Corner radius for rounded rectangle
+        float cornerRadius = 10f;
+        
+        Handles.BeginGUI();
+        
+        // Draw main background (center rectangle)
+        Rect centerRect = new Rect(nodeRect.x + cornerRadius, nodeRect.y, 
+                                    nodeRect.width - cornerRadius * 2, nodeRect.height);
+        EditorGUI.DrawRect(centerRect, mainGreen);
+        
+        // Draw top and bottom rectangles (vertical parts)
+        Rect topRect = new Rect(nodeRect.x, nodeRect.y + cornerRadius, 
+                               nodeRect.width, nodeRect.height - cornerRadius * 2);
+        EditorGUI.DrawRect(topRect, mainGreen);
+        
+        // Draw corner circles
+        Vector2 topLeft = new Vector2(nodeRect.x + cornerRadius, nodeRect.y + cornerRadius);
+        Vector2 topRight = new Vector2(nodeRect.x + nodeRect.width - cornerRadius, nodeRect.y + cornerRadius);
+        Vector2 bottomLeft = new Vector2(nodeRect.x + cornerRadius, nodeRect.y + nodeRect.height - cornerRadius);
+        Vector2 bottomRight = new Vector2(nodeRect.x + nodeRect.width - cornerRadius, nodeRect.y + nodeRect.height - cornerRadius);
+        
+        Handles.color = mainGreen;
+        Handles.DrawSolidDisc(topLeft, Vector3.forward, cornerRadius);
+        Handles.DrawSolidDisc(topRight, Vector3.forward, cornerRadius);
+        Handles.DrawSolidDisc(bottomLeft, Vector3.forward, cornerRadius);
+        Handles.DrawSolidDisc(bottomRight, Vector3.forward, cornerRadius);
+        
+        // Draw rounded border using Bezier curves
+        float borderWidth = isSelected ? 4f : 3f;
+        Handles.color = borderColor;
+        
+        // Top edge
+        Vector2 topLeftEdge = new Vector2(nodeRect.x + cornerRadius, nodeRect.y);
+        Vector2 topRightEdge = new Vector2(nodeRect.x + nodeRect.width - cornerRadius, nodeRect.y);
+        Handles.DrawAAPolyLine(borderWidth, topLeftEdge, topRightEdge);
+        
+        // Bottom edge
+        Vector2 bottomLeftEdge = new Vector2(nodeRect.x + cornerRadius, nodeRect.y + nodeRect.height);
+        Vector2 bottomRightEdge = new Vector2(nodeRect.x + nodeRect.width - cornerRadius, nodeRect.y + nodeRect.height);
+        Handles.DrawAAPolyLine(borderWidth, bottomLeftEdge, bottomRightEdge);
+        
+        // Left edge
+        Vector2 leftTopEdge = new Vector2(nodeRect.x, nodeRect.y + cornerRadius);
+        Vector2 leftBottomEdge = new Vector2(nodeRect.x, nodeRect.y + nodeRect.height - cornerRadius);
+        Handles.DrawAAPolyLine(borderWidth, leftTopEdge, leftBottomEdge);
+        
+        // Right edge
+        Vector2 rightTopEdge = new Vector2(nodeRect.x + nodeRect.width, nodeRect.y + cornerRadius);
+        Vector2 rightBottomEdge = new Vector2(nodeRect.x + nodeRect.width, nodeRect.y + nodeRect.height - cornerRadius);
+        Handles.DrawAAPolyLine(borderWidth, rightTopEdge, rightBottomEdge);
+        
+        // Draw rounded corners using Bezier curves (using 0.55 constant for circular approximation)
+        float bezierConstant = 0.55f;
+        
+        // Top-left corner
+        Vector2 tlStart = topLeftEdge;
+        Vector2 tlEnd = leftTopEdge;
+        Vector2 tlControl1 = new Vector2(tlStart.x - cornerRadius * bezierConstant, tlStart.y);
+        Vector2 tlControl2 = new Vector2(tlEnd.x, tlEnd.y - cornerRadius * bezierConstant);
+        Handles.DrawBezier(tlStart, tlEnd, tlControl1, tlControl2, borderColor, null, borderWidth);
+        
+        // Top-right corner
+        Vector2 trStart = topRightEdge;
+        Vector2 trEnd = rightTopEdge;
+        Vector2 trControl1 = new Vector2(trStart.x + cornerRadius * bezierConstant, trStart.y);
+        Vector2 trControl2 = new Vector2(trEnd.x, trEnd.y - cornerRadius * bezierConstant);
+        Handles.DrawBezier(trStart, trEnd, trControl1, trControl2, borderColor, null, borderWidth);
+        
+        // Bottom-left corner
+        Vector2 blStart = leftBottomEdge;
+        Vector2 blEnd = bottomLeftEdge;
+        Vector2 blControl1 = new Vector2(blStart.x, blStart.y + cornerRadius * bezierConstant);
+        Vector2 blControl2 = new Vector2(blEnd.x - cornerRadius * bezierConstant, blEnd.y);
+        Handles.DrawBezier(blStart, blEnd, blControl1, blControl2, borderColor, null, borderWidth);
+        
+        // Bottom-right corner
+        Vector2 brStart = rightBottomEdge;
+        Vector2 brEnd = bottomRightEdge;
+        Vector2 brControl1 = new Vector2(brStart.x, brStart.y + cornerRadius * bezierConstant);
+        Vector2 brControl2 = new Vector2(brEnd.x + cornerRadius * bezierConstant, brEnd.y);
+        Handles.DrawBezier(brStart, brEnd, brControl1, brControl2, borderColor, null, borderWidth);
+        
+        Handles.color = Color.white;
+        Handles.EndGUI();
+        
+        // Draw "ENTRY" text centered (lock all states to white so no hover color change)
+        GUIStyle textStyle = new GUIStyle(EditorStyles.boldLabel);
+        textStyle.alignment = TextAnchor.MiddleCenter;
+        textStyle.fontSize = 16;
+        textStyle.fontStyle = FontStyle.Bold;
+        textStyle.normal.textColor = Color.white;
+        textStyle.hover.textColor = Color.white;
+        textStyle.active.textColor = Color.white;
+        textStyle.focused.textColor = Color.white;
+        
+        Rect textRect = nodeRect;
+        
+        GUI.Label(textRect, "ENTRY", textStyle);
+    }
+    
+    private float GetNodeRenderHeight(SkillGraphNode node)
+    {
+        return (node is EntryNode) ? NODE_HEIGHT * 0.6f : NODE_HEIGHT;
+    }
     
     private void DrawConnections()
     {
@@ -644,8 +714,10 @@ public class SkillGraphEditor : EditorWindow
     
     private void DrawConnection(SkillGraphNode fromNode, SkillGraphNode toNode)
     {
-        Vector2 fromPos = fromNode.Position + panOffset + new Vector2(NODE_WIDTH, NODE_HEIGHT / 2);
-        Vector2 toPos = toNode.Position + panOffset + new Vector2(0, NODE_HEIGHT / 2);
+        float fromHeight = GetNodeRenderHeight(fromNode);
+        float toHeight = GetNodeRenderHeight(toNode);
+        Vector2 fromPos = fromNode.Position + panOffset + new Vector2(NODE_WIDTH, fromHeight / 2f);
+        Vector2 toPos = toNode.Position + panOffset + new Vector2(0, toHeight / 2f);
         
         // Draw line
         Handles.color = Color.white;
@@ -664,7 +736,8 @@ public class SkillGraphEditor : EditorWindow
     {
         if (connectingFromNode == null) return;
         
-        Vector2 fromPos = connectingFromNode.Position + panOffset + new Vector2(NODE_WIDTH, NODE_HEIGHT / 2);
+        float fromHeight = GetNodeRenderHeight(connectingFromNode);
+        Vector2 fromPos = connectingFromNode.Position + panOffset + new Vector2(NODE_WIDTH, fromHeight / 2f);
         Vector2 toPos = Event.current.mousePosition;
         
         Handles.BeginGUI();
@@ -708,11 +781,90 @@ public class SkillGraphEditor : EditorWindow
             Repaint();
         }
         
+        // Repaint when dragging during connection
+        if (isConnecting && e.type == EventType.MouseDrag)
+        {
+            Repaint();
+        }
+        
         if (e.type == EventType.MouseUp && (e.button == 2 || e.button == 0))
         {
+            bool handledMouseUp = false;
+            // Handle connection completion on mouse up
+            if (isConnecting && connectingFromNode != null)
+            {
+                bool connectionMade = false;
+                
+                // Check if released over another node's input handle
+                if (skillGraph != null && skillGraph.Nodes != null)
+                {
+                    foreach (var node in skillGraph.Nodes)
+                    {
+                        if (node != connectingFromNode)
+                        {
+                            float inHeight = GetNodeRenderHeight(node);
+                            Vector2 inputPos = node.Position + panOffset + new Vector2(0, inHeight / 2f);
+                            Rect inputRect = new Rect(inputPos.x - CONNECTION_HANDLE_SIZE / 2, 
+                                                      inputPos.y - CONNECTION_HANDLE_SIZE / 2, 
+                                                      CONNECTION_HANDLE_SIZE, CONNECTION_HANDLE_SIZE);
+                            if (inputRect.Contains(e.mousePosition))
+                            {
+                                // Complete connection to first execution input pin
+                                var inputPins = node.GetInputPins();
+                                var execInputPins = inputPins.Where(p => p.Type == PinType.Execution).ToList();
+                                if (execInputPins.Count > 0)
+                                {
+                                    if (connectingFromNode.AddConnection(connectingFromPinId, skillGraph, node.Id, execInputPins[0].Id))
+                                    {
+                                        connectionMade = true;
+                                        // Deselect node when creating connection
+                                        selectedNode = null;
+                                        GUI.changed = true;
+                                    }
+                                    else
+                                    {
+                                        Debug.LogWarning("Cannot create connection: Type mismatch or invalid connection");
+                                        connectingFromNode = null;
+                                        connectingFromPinId = null;
+                                        isConnecting = false;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // Cancel connection if not over another node
+                if (!connectionMade)
+                {
+                    connectingFromNode = null;
+                    connectingFromPinId = null;
+                    isConnecting = false;
+                }
+                else
+                {
+                    connectingFromNode = null;
+                    connectingFromPinId = null;
+                    isConnecting = false;
+                }
+                handledMouseUp = true;
+            }
+            
             isPanning = false;
             isDragging = false;
-            e.Use();
+            
+            // Auto-save after mouse up (when user finishes dragging/editing)
+            if (GUI.changed)
+            {
+                AutoSaveAssets();
+                handledMouseUp = true;
+            }
+
+            if (handledMouseUp)
+            {
+                e.Use();
+            }
         }
         
         // Zoom
@@ -766,7 +918,8 @@ public class SkillGraphEditor : EditorWindow
                 foreach (var node in skillGraph.Nodes)
                 {
                     Vector2 nodePos = node.Position + panOffset;
-                    Rect nodeRect = new Rect(nodePos.x, nodePos.y, NODE_WIDTH, NODE_HEIGHT);
+                    float nHeight = GetNodeRenderHeight(node);
+                    Rect nodeRect = new Rect(nodePos.x, nodePos.y, NODE_WIDTH, nHeight);
                     
                     if (nodeRect.Contains(e.mousePosition))
                     {
@@ -775,8 +928,8 @@ public class SkillGraphEditor : EditorWindow
                     }
                     
                     // Check handles
-                    Vector2 outputHandlePos = nodePos + new Vector2(NODE_WIDTH, NODE_HEIGHT / 2);
-                    Vector2 inputHandlePos = nodePos + new Vector2(0, NODE_HEIGHT / 2);
+                    Vector2 outputHandlePos = nodePos + new Vector2(NODE_WIDTH, nHeight / 2f);
+                    Vector2 inputHandlePos = nodePos + new Vector2(0, nHeight / 2f);
                     Rect outputHandleRect = new Rect(outputHandlePos.x - CONNECTION_HANDLE_SIZE / 2, 
                                                     outputHandlePos.y - CONNECTION_HANDLE_SIZE / 2, 
                                                     CONNECTION_HANDLE_SIZE, CONNECTION_HANDLE_SIZE);
@@ -823,6 +976,7 @@ public class SkillGraphEditor : EditorWindow
                 isConnecting = false;
             }
             GUI.changed = true;
+            AutoSaveAssets();
         }
     }
     
@@ -924,108 +1078,425 @@ public class SkillGraphEditor : EditorWindow
     
     private void DrawNodePropertiesInNode(SkillGraphNode node)
     {
-        // Draw properties inside the node itself
-        switch (node)
+        // Special handling for ConstantNode (has conditional fields based on ValueType)
+        if (node is ConstantNode constantNode)
         {
-            case SequenceNode seqNode:
+            DrawConstantNodeProperties(constantNode);
+            return;
+        }
+        
+        // Respect Inspector-like layout
+        float oldLabelWidth = EditorGUIUtility.labelWidth;
+        EditorGUIUtility.labelWidth = 110f;
+        
+        // Prefer serialized fields first (to honor attributes), then properties without corresponding fields
+        var fieldsToDraw = GetDrawableFields(node);
+        var drawnMemberNames = new HashSet<string>();
+        
+        foreach (var field in fieldsToDraw)
+        {
+            DrawMemberWithAttributes(node, field, isProperty: false);
+            drawnMemberNames.Add(field.Name);
+            // Also consider likely matching property name (PascalCase)
+            string possibleProp = char.ToUpper(field.Name[0]) + field.Name.Substring(1);
+            drawnMemberNames.Add(possibleProp);
+        }
+        
+        var propertiesToDraw = GetDrawableProperties(node)
+            .Where(p => !drawnMemberNames.Contains(p.Name))
+            .ToList();
+        foreach (var prop in propertiesToDraw)
+        {
+            DrawMemberWithAttributes(node, prop, isProperty: true);
+        }
+        
+        EditorGUIUtility.labelWidth = oldLabelWidth;
+    }
+    
+    private void DrawMemberWithAttributes(SkillGraphNode node, MemberInfo member, bool isProperty)
+    {
+        // Header/Space support
+        var headerAttr = member.GetCustomAttribute<HeaderAttribute>(false);
+        if (headerAttr != null)
+        {
+            EditorGUILayout.Space(6);
+            EditorGUILayout.LabelField(headerAttr.header, EditorStyles.boldLabel);
+        }
+        var spaceAttr = member.GetCustomAttribute<SpaceAttribute>(false);
+        if (spaceAttr != null)
+        {
+            EditorGUILayout.Space(spaceAttr.height);
+        }
+        
+        // Tooltip and range/text area metadata
+        var tooltipAttr = member.GetCustomAttribute<TooltipAttribute>(false);
+        var rangeAttr = member.GetCustomAttribute<RangeAttribute>(false);
+        var textAreaAttr = member.GetCustomAttribute<TextAreaAttribute>(false);
+        var minAttr = member.GetCustomAttribute<MinAttribute>(false);
+        
+        System.Type memberType = isProperty ? ((PropertyInfo)member).PropertyType : ((FieldInfo)member).FieldType;
+        string memberName = member.Name;
+        string labelText = FormatDisplayName(memberName);
+        GUIContent label = string.IsNullOrEmpty(tooltipAttr?.tooltip) ? new GUIContent(labelText) : new GUIContent(labelText, tooltipAttr.tooltip);
+        
+        EditorGUI.BeginChangeCheck();
+        object currentValue = isProperty ? ((PropertyInfo)member).GetValue(node) : ((FieldInfo)member).GetValue(node);
+        object newValue = DrawFieldValueWithAttributes(memberType, label, currentValue, rangeAttr, textAreaAttr, minAttr);
+        if (EditorGUI.EndChangeCheck())
+        {
+            if (isProperty)
+            {
+                ((PropertyInfo)member).SetValue(node, newValue);
+            }
+            else
+            {
+                ((FieldInfo)member).SetValue(node, newValue);
+            }
+            GUI.changed = true;
+        }
+    }
+    
+    private object DrawFieldValueWithAttributes(System.Type type, GUIContent label, object value, RangeAttribute range, TextAreaAttribute textArea, MinAttribute min)
+    {
+        // Handle attributes first where applicable (Range, TextArea)
+        if (type == typeof(int))
+        {
+            int v = value != null ? (int)value : 0;
+            if (range != null)
+            {
+                v = EditorGUILayout.IntSlider(label, v, Mathf.RoundToInt(range.min), Mathf.RoundToInt(range.max));
+            }
+            else
+            {
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Count:", GUILayout.Width(50));
-                int count = EditorGUILayout.IntField(seqNode.SequenceCount, GUILayout.Width(50));
-                if (count != seqNode.SequenceCount)
-                {
-                    seqNode.SequenceCount = count;
-                    GUI.changed = true;
-                }
+                EditorGUILayout.LabelField(label, GUILayout.Width(110f));
+                v = EditorGUILayout.IntField(GUIContent.none, v);
                 EditorGUILayout.EndHorizontal();
-                break;
-                
-            case LoopNode loopNode:
+            }
+            if (min != null) v = Mathf.Max((int)min.min, v);
+            return v;
+        }
+        if (type == typeof(float))
+        {
+            float v = value != null ? (float)value : 0f;
+            if (range != null)
+            {
+                v = EditorGUILayout.Slider(label, v, range.min, range.max);
+            }
+            else
+            {
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Count:", GUILayout.Width(50));
-                int loopCount = EditorGUILayout.IntField(loopNode.LoopCount, GUILayout.Width(50));
-                if (loopCount != loopNode.LoopCount)
-                {
-                    loopNode.LoopCount = loopCount;
-                    GUI.changed = true;
-                }
+                EditorGUILayout.LabelField(label, GUILayout.Width(110f));
+                v = EditorGUILayout.FloatField(GUIContent.none, v);
                 EditorGUILayout.EndHorizontal();
-                break;
+            }
+            if (min != null) v = Mathf.Max(min.min, v);
+            return v;
+        }
+        if (type == typeof(bool))
+        {
+            return EditorGUILayout.Toggle(label, value != null ? (bool)value : false);
+        }
+        if (type == typeof(string))
+        {
+            string v = value as string ?? string.Empty;
+            if (textArea != null)
+            {
+                int minLines = Mathf.Max(1, textArea.minLines);
+                int maxLines = Mathf.Max(minLines, textArea.maxLines);
+                // Draw a text area with min/max height similar to inspector
+                var style = EditorStyles.textArea;
+                float lineHeight = style.lineHeight > 0 ? style.lineHeight : 14f;
+                float minHeight = lineHeight * minLines + 8f;
+                float maxHeight = lineHeight * maxLines + 8f;
+                Rect r = GUILayoutUtility.GetRect(new GUIContent(v), style, GUILayout.ExpandWidth(true), GUILayout.MinHeight(minHeight), GUILayout.MaxHeight(maxHeight));
+                v = EditorGUI.TextArea(r, v, style);
+            }
+            else
+            {
+                v = EditorGUILayout.TextField(label, v);
+            }
+            return v;
+        }
+        if (type == typeof(Color))
+        {
+            Color c = value != null ? (Color)value : Color.white;
+            return EditorGUILayout.ColorField(label, c);
+        }
+        if (type == typeof(Vector2))
+        {
+            Vector2 v = value != null ? (Vector2)value : Vector2.zero;
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField(label, GUILayout.Width(110f));
+            v = EditorGUILayout.Vector2Field(GUIContent.none, v);
+            EditorGUILayout.EndHorizontal();
+            return v;
+        }
+        if (type == typeof(Vector3))
+        {
+            Vector3 v = value != null ? (Vector3)value : Vector3.zero;
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField(label, GUILayout.Width(110f));
+            v = EditorGUILayout.Vector3Field(GUIContent.none, v);
+            EditorGUILayout.EndHorizontal();
+            return v;
+        }
+        if (type == typeof(Vector4))
+        {
+            Vector4 v = value != null ? (Vector4)value : Vector4.zero;
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField(label, GUILayout.Width(110f));
+            v = EditorGUILayout.Vector4Field(GUIContent.none, v);
+            EditorGUILayout.EndHorizontal();
+            return v;
+        }
+        if (type == typeof(Quaternion))
+        {
+            Quaternion q = value != null ? (Quaternion)value : Quaternion.identity;
+            Vector3 euler = q.eulerAngles;
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField(label, GUILayout.Width(110f));
+            euler = EditorGUILayout.Vector3Field(GUIContent.none, euler);
+            EditorGUILayout.EndHorizontal();
+            return Quaternion.Euler(euler);
+        }
+        if (type == typeof(AnimationCurve))
+        {
+            AnimationCurve curve = value as AnimationCurve ?? AnimationCurve.Linear(0, 0, 1, 1);
+            return EditorGUILayout.CurveField(label, curve);
+        }
+        if (typeof(UnityEngine.Object).IsAssignableFrom(type))
+        {
+            return EditorGUILayout.ObjectField(label, value as UnityEngine.Object, type, true);
+        }
+        
+        // Fallback to previous generic drawer
+        return DrawFieldValue(type, label.text, value);
+    }
+    
+    private List<PropertyInfo> GetDrawableProperties(SkillGraphNode node)
+    {
+        var properties = new List<PropertyInfo>();
+        var nodeType = node.GetType();
+        
+        // Get all public properties that have getters and setters from the declared type only
+        foreach (var prop in nodeType.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+        {
+            // Skip properties that shouldn't be shown
+            if (ShouldSkipProperty(prop))
+                continue;
                 
-            case DelayNode delayNode:
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Duration:", GUILayout.Width(60));
-                float duration = EditorGUILayout.FloatField(delayNode.DelayDuration, GUILayout.Width(60));
-                if (duration != delayNode.DelayDuration)
-                {
-                    delayNode.DelayDuration = duration;
-                    GUI.changed = true;
-                }
-                EditorGUILayout.EndHorizontal();
-                break;
+            // Only include properties with both getter and setter
+            if (prop.CanRead && prop.CanWrite)
+            {
+                properties.Add(prop);
+            }
+        }
+        
+        return properties;
+    }
+    
+    private List<FieldInfo> GetDrawableFields(SkillGraphNode node)
+    {
+        var fields = new List<FieldInfo>();
+        var nodeType = node.GetType();
+        
+        // Get all fields (public or with [SerializeField]) from the declared type only
+        foreach (var field in nodeType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+        {
+            // Skip private fields without [SerializeField]
+            if (field.IsPrivate && !field.IsDefined(typeof(SerializeField), false))
+                continue;
                 
-            case HealNode healNode:
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Amount:", GUILayout.Width(60));
-                float healAmount = EditorGUILayout.FloatField(healNode.HealAmount, GUILayout.Width(60));
-                if (healAmount != healNode.HealAmount)
-                {
-                    healNode.HealAmount = healAmount;
-                    GUI.changed = true;
-                }
-                EditorGUILayout.EndHorizontal();
-                break;
+            // Skip fields that shouldn't be shown
+            if (ShouldSkipField(field))
+                continue;
                 
-            case DamageNode damageNode:
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Amount:", GUILayout.Width(60));
-                float damageAmount = EditorGUILayout.FloatField(damageNode.DamageAmount, GUILayout.Width(60));
-                if (damageAmount != damageNode.DamageAmount)
-                {
-                    damageNode.DamageAmount = damageAmount;
-                    GUI.changed = true;
-                }
-                EditorGUILayout.EndHorizontal();
+            fields.Add(field);
+        }
+        
+        return fields;
+    }
+    
+    private bool ShouldSkipProperty(PropertyInfo prop)
+    {
+        // Skip base class properties
+        string[] skipNames = { "Id", "Position", "Title", "Description" };
+        return skipNames.Contains(prop.Name);
+    }
+    
+    private bool ShouldSkipField(FieldInfo field)
+    {
+        // Skip base class fields
+        string[] skipNames = { "id", "position", "nodeTitle", "nodeDescription", "pinConnections" };
+        return skipNames.Contains(field.Name);
+    }
+    
+    private void DrawFieldOrProperty(SkillGraphNode node, MemberInfo member, bool isProperty)
+    {
+        System.Type memberType = isProperty ? ((PropertyInfo)member).PropertyType : ((FieldInfo)member).FieldType;
+        string memberName = member.Name;
+        
+        // Make a nice display name
+        string displayName = FormatDisplayName(memberName);
+        
+        EditorGUI.BeginChangeCheck();
+        object currentValue = isProperty ? ((PropertyInfo)member).GetValue(node) : ((FieldInfo)member).GetValue(node);
+        object newValue = DrawFieldValue(memberType, displayName, currentValue);
+        
+        if (EditorGUI.EndChangeCheck())
+        {
+            if (isProperty)
+            {
+                ((PropertyInfo)member).SetValue(node, newValue);
+            }
+            else
+            {
+                ((FieldInfo)member).SetValue(node, newValue);
+            }
+            GUI.changed = true;
+        }
+    }
+    
+    private string FormatDisplayName(string name)
+    {
+        // Remove common suffixes
+        if (name.EndsWith("Value"))
+            name = name.Substring(0, name.Length - 5);
+        if (name.EndsWith("Count"))
+            name = name.Substring(0, name.Length - 5);
+        if (name.EndsWith("Amount"))
+            name = name.Substring(0, name.Length - 6);
+        if (name.EndsWith("Duration"))
+            name = name.Substring(0, name.Length - 8);
+            
+        // Convert camelCase to Title Case
+        if (string.IsNullOrEmpty(name))
+            return name;
+            
+        StringBuilder result = new StringBuilder();
+        result.Append(char.ToUpper(name[0]));
+        for (int i = 1; i < name.Length; i++)
+        {
+            if (char.IsUpper(name[i]))
+            {
+                result.Append(' ');
+            }
+            result.Append(name[i]);
+        }
+        
+        return result.ToString() + ":";
+    }
+    
+    private object DrawFieldValue(System.Type type, string label, object value)
+    {
+        if (type == typeof(int))
+        {
+            return EditorGUILayout.IntField(label, value != null ? (int)value : 0, GUILayout.Width(NODE_WIDTH - 20));
+        }
+        else if (type == typeof(float))
+        {
+            return EditorGUILayout.FloatField(label, value != null ? (float)value : 0f, GUILayout.Width(NODE_WIDTH - 20));
+        }
+        else if (type == typeof(bool))
+        {
+            return EditorGUILayout.Toggle(label, value != null ? (bool)value : false);
+        }
+        else if (type == typeof(string))
+        {
+            return EditorGUILayout.TextField(label, value != null ? (string)value : "");
+        }
+        else if (type == typeof(Vector2))
+        {
+            return EditorGUILayout.Vector2Field(label, value != null ? (Vector2)value : Vector2.zero);
+        }
+        else if (type == typeof(Vector3))
+        {
+            return EditorGUILayout.Vector3Field(label, value != null ? (Vector3)value : Vector3.zero);
+        }
+        else if (type.IsEnum)
+        {
+            return EditorGUILayout.EnumPopup(label, value != null ? (System.Enum)value : System.Enum.GetValues(type).GetValue(0) as System.Enum);
+        }
+        else if (type == typeof(UnityEngine.Object) || type.IsSubclassOf(typeof(UnityEngine.Object)))
+        {
+            return EditorGUILayout.ObjectField(label, value as UnityEngine.Object, type, true);
+        }
+        else
+        {
+            // Unknown type, skip it
+            return value;
+        }
+    }
+    
+    private void DrawConstantNodeProperties(ConstantNode constantNode)
+    {
+        // Draw ValueType first
+        EditorGUI.BeginChangeCheck();
+        constantNode.ValueType = (ConstantValueType)EditorGUILayout.EnumPopup("Value Type:", constantNode.ValueType);
+        if (EditorGUI.EndChangeCheck())
+        {
+            GUI.changed = true;
+        }
+        
+        // Draw the appropriate value field based on ValueType
+        EditorGUI.BeginChangeCheck();
+        switch (constantNode.ValueType)
+        {
+            case ConstantValueType.Int:
+                constantNode.IntValue = EditorGUILayout.IntField("Value:", constantNode.IntValue);
                 break;
-                
-            case ApplyStatusNode statusNode:
-                statusNode.StatusName = EditorGUILayout.TextField("Status:", statusNode.StatusName);
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Duration:", GUILayout.Width(60));
-                float statusDuration = EditorGUILayout.FloatField(statusNode.Duration, GUILayout.Width(60));
-                if (statusDuration != statusNode.Duration)
-                {
-                    statusNode.Duration = statusDuration;
-                    GUI.changed = true;
-                }
-                EditorGUILayout.EndHorizontal();
+            case ConstantValueType.Float:
+                constantNode.FloatValue = EditorGUILayout.FloatField("Value:", constantNode.FloatValue);
                 break;
-                
-            case ConstantNode constantNode:
-                constantNode.ValueType = (ConstantValueType)EditorGUILayout.EnumPopup(constantNode.ValueType);
-                switch (constantNode.ValueType)
-                {
-                    case ConstantValueType.Int:
-                        constantNode.IntValue = EditorGUILayout.IntField("Value:", constantNode.IntValue);
-                        break;
-                    case ConstantValueType.Float:
-                        constantNode.FloatValue = EditorGUILayout.FloatField("Value:", constantNode.FloatValue);
-                        break;
-                    case ConstantValueType.Bool:
-                        constantNode.BoolValue = EditorGUILayout.Toggle("Value:", constantNode.BoolValue);
-                        break;
-                    case ConstantValueType.String:
-                        constantNode.StringValue = EditorGUILayout.TextField("Value:", constantNode.StringValue);
-                        break;
-                }
+            case ConstantValueType.Bool:
+                constantNode.BoolValue = EditorGUILayout.Toggle("Value:", constantNode.BoolValue);
                 break;
-                
-            case CalculateNode calcNode:
-                calcNode.Operation = (CalculateOperation)EditorGUILayout.EnumPopup(calcNode.Operation);
+            case ConstantValueType.String:
+                constantNode.StringValue = EditorGUILayout.TextField("Value:", constantNode.StringValue);
                 break;
-                
-            case CompareNode compareNode:
-                compareNode.Operation = (CompareOperation)EditorGUILayout.EnumPopup(compareNode.Operation);
+            case ConstantValueType.Vector3:
+                constantNode.Vector3Value = EditorGUILayout.Vector3Field("Value:", constantNode.Vector3Value);
                 break;
+        }
+        if (EditorGUI.EndChangeCheck())
+        {
+            GUI.changed = true;
+        }
+    }
+
+    private SkillGraphNode InstantiateNode(System.Type nodeType, Vector2 position)
+    {
+        if (nodeType == null) return null;
+
+        // Try to get cached Vector2 constructor
+        if (!nodeConstructorCache.TryGetValue(nodeType, out ConstructorInfo cachedCtor))
+        {
+            // Prefer ctor(Vector2)
+            cachedCtor = nodeType.GetConstructor(new Type[] { typeof(Vector2) });
+            // Cache (may be null if not present)
+            nodeConstructorCache[nodeType] = cachedCtor;
+        }
+
+        try
+        {
+            if (cachedCtor != null)
+            {
+                return (SkillGraphNode)cachedCtor.Invoke(new object[] { position });
+            }
+
+            // Fallback to parameterless constructor
+            var node = (SkillGraphNode)Activator.CreateInstance(nodeType);
+            if (node != null)
+            {
+                node.Position = position;
+            }
+            return node;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Failed to instantiate node of type {nodeType?.Name}: {ex.Message}");
+            return null;
         }
     }
 }
