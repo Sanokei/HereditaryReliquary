@@ -7,12 +7,16 @@ public class SkillTreeEditor : EditorWindow
     private SkillTree skillTree;
     private SkillNode selectedNode;
     private SkillNode connectingFromNode;
+    private string selectedConnectionFromId;
+    private string selectedConnectionToId;
     private Vector2 panOffset = Vector2.zero;
     private float zoom = 1f;
     private const float NODE_WIDTH = 200f;
     private const float NODE_HEIGHT = 100f;
     private const float CONNECTION_ARROW_SIZE = 10f;
     private const float CONNECTION_HANDLE_SIZE = 15f;
+    private const float CONNECTION_LINE_WIDTH = 10f;
+    private const float CONNECTION_SELECTION_WIDTH = 12f;
     
     private Vector2 lastMousePosition;
     private bool isDragging = false;
@@ -58,12 +62,19 @@ public class SkillTreeEditor : EditorWindow
             DrawConnectionPreview();
         }
         
-        // Handle node deletion
+        // Handle node and connection deletion
         if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Delete)
         {
             if (selectedNode != null)
             {
                 DeleteNode(selectedNode);
+            }
+            else if (!string.IsNullOrEmpty(selectedConnectionFromId) && !string.IsNullOrEmpty(selectedConnectionToId))
+            {
+                skillTree.RemovePrerequisite(selectedConnectionFromId, selectedConnectionToId);
+                selectedConnectionFromId = null;
+                selectedConnectionToId = null;
+                GUI.changed = true;
             }
         }
         
@@ -98,6 +109,17 @@ public class SkillTreeEditor : EditorWindow
             {
                 DeleteNode(selectedNode);
             }
+            
+            if (!string.IsNullOrEmpty(selectedConnectionFromId) && !string.IsNullOrEmpty(selectedConnectionToId))
+            {
+                if (GUILayout.Button("Delete Connection", EditorStyles.toolbarButton))
+                {
+                    skillTree.RemovePrerequisite(selectedConnectionFromId, selectedConnectionToId);
+                    selectedConnectionFromId = null;
+                    selectedConnectionToId = null;
+                    GUI.changed = true;
+                }
+            }
         }
         
         EditorGUILayout.EndHorizontal();
@@ -123,7 +145,6 @@ public class SkillTreeEditor : EditorWindow
         {
             skillTree = CreateInstance<SkillTree>();
             skillTree.nodes = new List<SkillNode>();
-            skillTree.treeName = "New Skill Tree";
             AssetDatabase.CreateAsset(skillTree, path);
             AssetDatabase.SaveAssets();
         }
@@ -198,10 +219,16 @@ public class SkillTreeEditor : EditorWindow
             ISkill skillInterface = node.GetSkill();
             EditorGUILayout.LabelField(skillInterface.SkillName, EditorStyles.boldLabel);
             
-            // Skill points required
+            // Skill points required (more prominent with slider)
+            EditorGUILayout.Space(5);
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("Points:", GUILayout.Width(50));
-            node.skill.skillPointsRequired = EditorGUILayout.IntField(node.skill.skillPointsRequired, GUILayout.Width(50));
+            EditorGUILayout.LabelField("Skill Points:", GUILayout.Width(80));
+            EditorGUI.BeginChangeCheck();
+            node.skill.skillPointsRequired = EditorGUILayout.IntSlider(node.skill.skillPointsRequired, 1, 100);
+            if (EditorGUI.EndChangeCheck())
+            {
+                GUI.changed = true;
+            }
             EditorGUILayout.EndHorizontal();
             
             // Show cooldown info if applicable
@@ -260,20 +287,36 @@ public class SkillTreeEditor : EditorWindow
                 if (connectingFromNode == node)
                 {
                     connectingFromNode = null;
+                    isConnecting = false;
                 }
                 else
                 {
                     connectingFromNode = node;
                     isConnecting = true;
+                    // Deselect node and connection when starting connection
+                    selectedNode = null;
+                    selectedConnectionFromId = null;
+                    selectedConnectionToId = null;
                 }
                 Event.current.Use();
             }
             else if (inputHandleRect.Contains(Event.current.mousePosition) && connectingFromNode != null && connectingFromNode != node)
             {
-                skillTree.AddPrerequisite(connectingFromNode.id, node.id);
-                connectingFromNode = null;
-                isConnecting = false;
-                GUI.changed = true;
+                if (skillTree.AddPrerequisite(connectingFromNode.id, node.id))
+                {
+                    connectingFromNode = null;
+                    isConnecting = false;
+                    // Deselect node when creating connection
+                    selectedNode = null;
+                    GUI.changed = true;
+                }
+                else
+                {
+                    // Would create a cycle or invalid connection
+                    Debug.LogWarning($"Cannot create prerequisite: This would create a circular dependency in the skill tree.");
+                    connectingFromNode = null;
+                    isConnecting = false;
+                }
                 Event.current.Use();
             }
         }
@@ -284,6 +327,8 @@ public class SkillTreeEditor : EditorWindow
             if (Event.current.button == 0 && !outputHandleRect.Contains(Event.current.mousePosition) && !inputHandleRect.Contains(Event.current.mousePosition))
             {
                 selectedNode = node;
+                selectedConnectionFromId = null; // Deselect connection when selecting node
+                selectedConnectionToId = null;
                 isDragging = true;
                 lastMousePosition = Event.current.mousePosition;
                 Event.current.Use();
@@ -306,30 +351,6 @@ public class SkillTreeEditor : EditorWindow
         if (isConnecting && connectingFromNode == node && Event.current.type == EventType.MouseDrag)
         {
             Repaint();
-        }
-        
-        if (Event.current.type == EventType.MouseUp && isConnecting)
-        {
-            // Check if released over another node's input handle
-            foreach (var otherNode in skillTree.nodes)
-            {
-                if (otherNode != node)
-                {
-                    Vector2 otherInputPos = otherNode.position + panOffset + new Vector2(0, NODE_HEIGHT / 2);
-                    Rect otherInputRect = new Rect(otherInputPos.x - CONNECTION_HANDLE_SIZE / 2, 
-                                                   otherInputPos.y - CONNECTION_HANDLE_SIZE / 2, 
-                                                   CONNECTION_HANDLE_SIZE, CONNECTION_HANDLE_SIZE);
-                    if (otherInputRect.Contains(Event.current.mousePosition))
-                    {
-                        skillTree.AddPrerequisite(node.id, otherNode.id);
-                        GUI.changed = true;
-                        break;
-                    }
-                }
-            }
-            connectingFromNode = null;
-            isConnecting = false;
-            Event.current.Use();
         }
     }
     
@@ -361,28 +382,64 @@ public class SkillTreeEditor : EditorWindow
         Vector2 fromPos = from.position + panOffset + new Vector2(NODE_WIDTH, NODE_HEIGHT / 2);
         Vector2 toPos = to.position + panOffset + new Vector2(0, NODE_HEIGHT / 2);
         
-        // Draw line
-        Handles.color = Color.white;
-        Handles.DrawAAPolyLine(2f, fromPos, toPos);
+        bool isSelected = (selectedConnectionFromId == from.id && selectedConnectionToId == to.id);
         
-        // Draw arrow
+        // Draw selection highlight if selected
+        if (isSelected)
+        {
+            Handles.color = Color.yellow;
+            Handles.DrawAAPolyLine(CONNECTION_SELECTION_WIDTH + 2f, fromPos, toPos);
+        }
+        
+        // Draw line (thicker)
+        Handles.color = isSelected ? Color.yellow : Color.white;
+        Handles.DrawAAPolyLine(CONNECTION_LINE_WIDTH, fromPos, toPos);
+        
+        // Draw arrow (thicker)
         Vector2 direction = (toPos - fromPos).normalized;
         Vector2 arrowBase = toPos - direction * 20f;
         Vector2 perpendicular = new Vector2(-direction.y, direction.x) * CONNECTION_ARROW_SIZE;
         
-        Handles.DrawAAPolyLine(2f, arrowBase + perpendicular, toPos);
-        Handles.DrawAAPolyLine(2f, arrowBase - perpendicular, toPos);
+        Handles.DrawAAPolyLine(CONNECTION_LINE_WIDTH, arrowBase + perpendicular, toPos);
+        Handles.DrawAAPolyLine(CONNECTION_LINE_WIDTH, arrowBase - perpendicular, toPos);
         
-        // Draw connection handle for deletion
+        // Connection selection logic has been moved to HandleInput() to work properly
+        
+        // Right-click to delete (old behavior preserved)
         Vector2 midPoint = (fromPos + toPos) / 2;
         Rect handleRect = new Rect(midPoint.x - 10, midPoint.y - 10, 20, 20);
         
         if (Event.current.type == EventType.MouseDown && Event.current.button == 1 && handleRect.Contains(Event.current.mousePosition))
         {
             skillTree.RemovePrerequisite(from.id, to.id);
+            if (selectedConnectionFromId == from.id && selectedConnectionToId == to.id)
+            {
+                selectedConnectionFromId = null;
+                selectedConnectionToId = null;
+            }
             GUI.changed = true;
             Event.current.Use();
         }
+    }
+    
+    /// <summary>
+    /// Calculates the distance from a point to a line segment
+    /// </summary>
+    private float DistanceToLineSegment(Vector2 point, Vector2 lineStart, Vector2 lineEnd)
+    {
+        Vector2 line = lineEnd - lineStart;
+        float lineLength = line.magnitude;
+        
+        if (lineLength < 0.001f)
+            return Vector2.Distance(point, lineStart);
+        
+        Vector2 lineNormalized = line / lineLength;
+        Vector2 pointToStart = point - lineStart;
+        
+        float t = Mathf.Clamp01(Vector2.Dot(pointToStart, lineNormalized));
+        Vector2 closestPoint = lineStart + lineNormalized * t;
+        
+        return Vector2.Distance(point, closestPoint);
     }
     
     private void DrawConnectionPreview()
@@ -394,7 +451,18 @@ public class SkillTreeEditor : EditorWindow
         
         Handles.BeginGUI();
         Handles.color = Color.yellow;
-        Handles.DrawAAPolyLine(2f, fromPos, toPos);
+        Handles.DrawAAPolyLine(CONNECTION_LINE_WIDTH, fromPos, toPos);
+        
+        // Draw preview arrow
+        Vector2 direction = (toPos - fromPos).normalized;
+        if (direction.magnitude > 0.1f)
+        {
+            Vector2 arrowBase = toPos - direction * 20f;
+            Vector2 perpendicular = new Vector2(-direction.y, direction.x) * CONNECTION_ARROW_SIZE;
+            Handles.DrawAAPolyLine(CONNECTION_LINE_WIDTH, arrowBase + perpendicular, toPos);
+            Handles.DrawAAPolyLine(CONNECTION_LINE_WIDTH, arrowBase - perpendicular, toPos);
+        }
+        
         Handles.EndGUI();
         
         Repaint();
@@ -423,9 +491,85 @@ public class SkillTreeEditor : EditorWindow
         
         if (e.type == EventType.MouseUp && (e.button == 2 || e.button == 0))
         {
+            // Handle connection completion on mouse up
+            if (isConnecting && connectingFromNode != null)
+            {
+                bool connectionMade = false;
+                
+                // Check if released over another node's input handle
+                foreach (var node in skillTree.nodes)
+                {
+                    if (node != connectingFromNode)
+                    {
+                        Vector2 inputPos = node.position + panOffset + new Vector2(0, NODE_HEIGHT / 2);
+                        Rect inputRect = new Rect(inputPos.x - CONNECTION_HANDLE_SIZE / 2, 
+                                                  inputPos.y - CONNECTION_HANDLE_SIZE / 2, 
+                                                  CONNECTION_HANDLE_SIZE, CONNECTION_HANDLE_SIZE);
+                        if (inputRect.Contains(e.mousePosition))
+                        {
+                            if (skillTree.AddPrerequisite(connectingFromNode.id, node.id))
+                            {
+                                connectionMade = true;
+                                // Deselect node when creating connection
+                                selectedNode = null;
+                                GUI.changed = true;
+                            }
+                            else
+                            {
+                                // Would create a cycle or invalid connection
+                                Debug.LogWarning($"Cannot create prerequisite: This would create a circular dependency in the skill tree.");
+                                connectingFromNode = null;
+                                isConnecting = false;
+                            }
+                            break;
+                        }
+                    }
+                }
+                
+                // Cancel connection if not over another node
+                if (!connectionMade)
+                {
+                    connectingFromNode = null;
+                    isConnecting = false;
+                }
+                else
+                {
+                    connectingFromNode = null;
+                    isConnecting = false;
+                }
+            }
+            
             isPanning = false;
             isDragging = false;
             e.Use();
+        }
+        
+        // Double-click on background to create new node
+        if (e.type == EventType.MouseDown && e.button == 0 && e.clickCount == 2)
+        {
+            // Check if clicking on background (not on any node)
+            bool clickedOnNode = false;
+            foreach (var node in skillTree.nodes)
+            {
+                Vector2 nodePos = node.position + panOffset;
+                Rect nodeRect = new Rect(nodePos.x, nodePos.y, NODE_WIDTH, NODE_HEIGHT);
+                if (nodeRect.Contains(e.mousePosition))
+                {
+                    clickedOnNode = true;
+                    break;
+                }
+            }
+            
+            if (!clickedOnNode && !isConnecting && !isPanning)
+            {
+                // Calculate position relative to pan offset
+                Vector2 newNodePos = e.mousePosition - panOffset - new Vector2(NODE_WIDTH / 2, NODE_HEIGHT / 2);
+                SkillNode newNode = new SkillNode(newNodePos);
+                skillTree.AddNode(newNode);
+                selectedNode = newNode;
+                GUI.changed = true;
+                e.Use();
+            }
         }
         
         // Zoom with scroll wheel
@@ -449,7 +593,80 @@ public class SkillTreeEditor : EditorWindow
         {
             connectingFromNode = null;
             isConnecting = false;
+            // Also deselect connections
+            selectedConnectionFromId = null;
+            selectedConnectionToId = null;
             e.Use();
+        }
+        
+        // Deselect connection on background click
+        if (e.type == EventType.MouseDown && e.button == 0 && e.clickCount == 1)
+        {
+            // Check if clicking on background (not on any node or connection)
+            bool clickedOnNode = false;
+            bool clickedOnConnection = false;
+            
+            // Check nodes
+            foreach (var node in skillTree.nodes)
+            {
+                Vector2 nodePos = node.position + panOffset;
+                Rect nodeRect = new Rect(nodePos.x, nodePos.y, NODE_WIDTH, NODE_HEIGHT);
+                if (nodeRect.Contains(e.mousePosition))
+                {
+                    clickedOnNode = true;
+                    break;
+                }
+                
+                // Check handles
+                Vector2 outputHandlePos = nodePos + new Vector2(NODE_WIDTH, NODE_HEIGHT / 2);
+                Vector2 inputHandlePos = nodePos + new Vector2(0, NODE_HEIGHT / 2);
+                Rect outputHandleRect = new Rect(outputHandlePos.x - CONNECTION_HANDLE_SIZE / 2, 
+                                                outputHandlePos.y - CONNECTION_HANDLE_SIZE / 2, 
+                                                CONNECTION_HANDLE_SIZE, CONNECTION_HANDLE_SIZE);
+                Rect inputHandleRect = new Rect(inputHandlePos.x - CONNECTION_HANDLE_SIZE / 2, 
+                                               inputHandlePos.y - CONNECTION_HANDLE_SIZE / 2, 
+                                               CONNECTION_HANDLE_SIZE, CONNECTION_HANDLE_SIZE);
+                if (outputHandleRect.Contains(e.mousePosition) || inputHandleRect.Contains(e.mousePosition))
+                {
+                    clickedOnNode = true;
+                    break;
+                }
+            }
+            
+            // Check connections (rough check - if near any connection line)
+            if (!clickedOnNode)
+            {
+                foreach (var node in skillTree.nodes)
+                {
+                    if (node.prerequisites == null) continue;
+                    foreach (var prereqId in node.prerequisites)
+                    {
+                        SkillNode prereqNode = skillTree.GetNode(prereqId);
+                        if (prereqNode != null)
+                        {
+                            Vector2 fromPos = prereqNode.position + panOffset + new Vector2(NODE_WIDTH, NODE_HEIGHT / 2);
+                            Vector2 toPos = node.position + panOffset + new Vector2(0, NODE_HEIGHT / 2);
+                            float distanceToLine = DistanceToLineSegment(e.mousePosition, fromPos, toPos);
+                            float clickableDistance = CONNECTION_LINE_WIDTH * 2f; // Match the clickable area
+                            if (distanceToLine < clickableDistance)
+                            {
+                                clickedOnConnection = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (clickedOnConnection) break;
+                }
+            }
+            
+            // If clicking on background, deselect everything
+            if (!clickedOnNode && !clickedOnConnection && !isConnecting && !isPanning)
+            {
+                selectedConnectionFromId = null;
+                selectedConnectionToId = null;
+                selectedNode = null; // Also deselect nodes
+                GUI.changed = true;
+            }
         }
     }
     
