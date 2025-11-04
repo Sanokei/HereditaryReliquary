@@ -16,10 +16,7 @@ public enum SkillType
 }
 
 [CreateAssetMenu(fileName = "New Skill", menuName = "Adventurers/Skill")]
-public class Skill : ScriptableObject, ISkill
-#if UNITY_EDITOR
-    , IGUIVisualizable
-#endif
+public class Skill : ScriptableObject, ISkill, ICooldownSkill
 {
     [Header("Basic Information")]
     [SerializeField] private string skillName;
@@ -32,73 +29,70 @@ public class Skill : ScriptableObject, ISkill
     [Range(1, 100)]
     public int skillPointsRequired = 1;
     
-    [Header("Skill Graph")]
-    [SerializeField, HideInInspector] private SkillGraph skillGraph;
+    [Header("Cooldown")]
+    [SerializeField] private bool requiresCooldown = true;
+    [SerializeField] private float cooldownDuration = 5f;
     
-    [Header("Effects (Legacy - Deprecated)")]
-    [SerializeField] private SkillEffect[] effects = new SkillEffect[0];
+    // Cooldown state (runtime only, not serialized)
+    private float cooldownEndTime = 0f;
     
     // ISkill implementation
     public string SkillName => skillName;
     public string Description => description;
     
+    // ICooldownSkill implementation
+    public bool IsCoolingDown => requiresCooldown && Time.time < cooldownEndTime;
+    public float RemainingCooldown => IsCoolingDown ? Mathf.Max(0f, cooldownEndTime - Time.time) : 0f;
+    public float CooldownDuration => cooldownDuration;
+    
+    public void StartCooldown()
+    {
+        if (requiresCooldown)
+        {
+            cooldownEndTime = Time.time + cooldownDuration;
+        }
+    }
+    
+    /// <summary>
+    /// Validates that the skill can be performed (checks cooldown and null performer)
+    /// Returns true if validation passes, false otherwise
+    /// </summary>
+    protected virtual bool ValidatePerform(IActor performer)
+    {
+        // Check cooldown if enabled
+        if (requiresCooldown && IsCoolingDown)
+        {
+            Debug.LogWarning($"{skillName} is on cooldown. Remaining: {RemainingCooldown:F1}s");
+            return false;
+        }
+        
+        // Check if performer is null
+        if (performer == null)
+        {
+            Debug.LogError($"{skillName}: Performer is null!");
+            return false;
+        }
+        
+        return true;
+    }
+    
     /// <summary>
     /// Performs the skill with the given actor
+    /// Override this method in derived classes to implement custom skill behavior
     /// </summary>
     public virtual void Perform(IActor performer)
     {
-        // Use graph-based system if available
-        if (skillGraph != null)
+        // Validate before performing
+        if (!ValidatePerform(performer))
         {
-            SkillGraphExecutor.Execute(skillGraph, performer);
-            Debug.Log($"{skillName} performed by {performer.Name}");
             return;
         }
         
-        // Fall back to legacy effects system
-        if (effects == null || effects.Length == 0)
-        {
-            Debug.Log($"{skillName} performed by {performer.Name}, but has no effects or graph.");
-            return;
-        }
         
-        foreach (var effect in effects)
-        {
-            if (effect != null)
-            {
-                effect.Apply(performer);
-            }
-        }
+        // Start cooldown after performing
+        StartCooldown();
         
         Debug.Log($"{skillName} performed by {performer.Name}");
-    }
-    
-    /// <summary>
-    /// Gets the skill graph
-    /// </summary>
-    public SkillGraph GetSkillGraph() => skillGraph;
-    
-    /// <summary>
-    /// Sets the skill graph
-    /// </summary>
-    public void SetSkillGraph(SkillGraph graph)
-    {
-        skillGraph = graph;
-    }
-    
-    /// <summary>
-    /// Gets all effects of this skill (legacy system)
-    /// </summary>
-    [System.Obsolete("Use SkillGraph instead. This method is for backward compatibility only.")]
-    public SkillEffect[] GetEffects() => effects;
-    
-    /// <summary>
-    /// Sets the effects for this skill (legacy system)
-    /// </summary>
-    [System.Obsolete("Use SkillGraph instead. This method is for backward compatibility only.")]
-    public void SetEffects(SkillEffect[] newEffects)
-    {
-        effects = newEffects;
     }
     
 #if UNITY_EDITOR
@@ -138,76 +132,16 @@ public class Skill : ScriptableObject, ISkill
         pointsLabel.style.marginTop = 5;
         rootElement.Add(pointsLabel);
         
-        // Skill Graph
-        if (skillGraph != null)
+        // Cooldown info
+        if (requiresCooldown)
         {
-            var graphContainer = new VisualElement();
-            graphContainer.name = "GraphContainer";
-            graphContainer.style.marginTop = 10;
-            
-            var graphHeader = new Label("Skill Graph:");
-            graphHeader.style.fontSize = 14;
-            graphHeader.style.unityFontStyleAndWeight = FontStyle.Bold;
-            graphContainer.Add(graphHeader);
-            
-            var graphLabel = new Label($"• {skillGraph.GraphName} ({skillGraph.Nodes.Count} nodes)");
-            graphLabel.style.marginLeft = 10;
-            graphContainer.Add(graphLabel);
-            
-            rootElement.Add(graphContainer);
-        }
-        
-        // Effects (Legacy)
-        if (effects != null && effects.Length > 0)
-        {
-            var effectsContainer = new VisualElement();
-            effectsContainer.name = "EffectsContainer";
-            effectsContainer.style.marginTop = 10;
-            
-            var effectsHeader = new Label("Effects:");
-            effectsHeader.style.fontSize = 14;
-            effectsHeader.style.unityFontStyleAndWeight = FontStyle.Bold;
-            effectsContainer.Add(effectsHeader);
-            
-            foreach (var effect in effects)
-            {
-                if (effect != null)
-                {
-                    if (TryCreateEffectGUI(effect, out var effectGUI))
-                    {
-                        effectsContainer.Add(effectGUI);
-                    }
-                    else
-                    {
-                        // Fallback to description
-                        var effectLabel = new Label($"• {effect.GetDescription()}");
-                        effectLabel.style.marginLeft = 10;
-                        effectsContainer.Add(effectLabel);
-                    }
-                }
-            }
-            
-            rootElement.Add(effectsContainer);
+            var cooldownLabel = new Label($"Cooldown: {cooldownDuration}s");
+            cooldownLabel.style.marginTop = 5;
+            rootElement.Add(cooldownLabel);
         }
         
         return rootElement;
     }
-    
-    /// <summary>
-    /// Attempts to create GUI for a skill effect
-    /// </summary>
-    protected virtual bool TryCreateEffectGUI(SkillEffect effect, out VisualElement effectGUI)
-    {
-#if UNITY_EDITOR
-        if (effect is ISkillEffectVisualizable visualizable)
-        {
-            effectGUI = visualizable.CreateGUI();
-            return effectGUI != null;
-        }
-#endif
-        
-        effectGUI = null;
-        return false;
-    }
+
 #endif
 }
