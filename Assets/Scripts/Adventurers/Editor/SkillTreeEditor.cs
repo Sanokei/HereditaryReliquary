@@ -15,8 +15,8 @@ public class SkillTreeEditor : EditorWindow
     private const float NODE_HEIGHT = 100f;
     private const float CONNECTION_ARROW_SIZE = 10f;
     private const float CONNECTION_HANDLE_SIZE = 15f;
-    private const float CONNECTION_LINE_WIDTH = 10f;
-    private const float CONNECTION_SELECTION_WIDTH = 12f;
+    private const float CONNECTION_LINE_WIDTH = 6f;
+    private const float CONNECTION_SELECTION_WIDTH = 8f;
     
     private Vector2 lastMousePosition;
     private bool isDragging = false;
@@ -60,22 +60,6 @@ public class SkillTreeEditor : EditorWindow
         if (connectingFromNode != null)
         {
             DrawConnectionPreview();
-        }
-        
-        // Handle node and connection deletion
-        if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Delete)
-        {
-            if (selectedNode != null)
-            {
-                DeleteNode(selectedNode);
-            }
-            else if (!string.IsNullOrEmpty(selectedConnectionFromId) && !string.IsNullOrEmpty(selectedConnectionToId))
-            {
-                skillTree.RemovePrerequisite(selectedConnectionFromId, selectedConnectionToId);
-                selectedConnectionFromId = null;
-                selectedConnectionToId = null;
-                GUI.changed = true;
-            }
         }
         
         if (GUI.changed)
@@ -321,10 +305,10 @@ public class SkillTreeEditor : EditorWindow
             }
         }
         
-        // Handle node selection and dragging
-        if (Event.current.type == EventType.MouseDown && nodeRect.Contains(Event.current.mousePosition))
+        // Handle node selection and dragging (single click to select)
+        if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && nodeRect.Contains(Event.current.mousePosition))
         {
-            if (Event.current.button == 0 && !outputHandleRect.Contains(Event.current.mousePosition) && !inputHandleRect.Contains(Event.current.mousePosition))
+            if (!outputHandleRect.Contains(Event.current.mousePosition) && !inputHandleRect.Contains(Event.current.mousePosition))
             {
                 selectedNode = node;
                 selectedConnectionFromId = null; // Deselect connection when selecting node
@@ -403,7 +387,59 @@ public class SkillTreeEditor : EditorWindow
         Handles.DrawAAPolyLine(CONNECTION_LINE_WIDTH, arrowBase + perpendicular, toPos);
         Handles.DrawAAPolyLine(CONNECTION_LINE_WIDTH, arrowBase - perpendicular, toPos);
         
-        // Connection selection logic has been moved to HandleInput() to work properly
+        // Check if connection is clicked for selection
+        if (Event.current.type == EventType.MouseDown && Event.current.button == 0)
+        {
+            Vector2 mousePos = Event.current.mousePosition;
+            
+            // Check if click is on the output handle (green dot) for this specific connection
+            Vector2 fromNodePos = from.position + panOffset;
+            Vector2 outputHandlePos = fromNodePos + new Vector2(NODE_WIDTH, NODE_HEIGHT / 2);
+            Rect outputHandleRect = new Rect(outputHandlePos.x - CONNECTION_HANDLE_SIZE / 2, 
+                                            outputHandlePos.y - CONNECTION_HANDLE_SIZE / 2, 
+                                            CONNECTION_HANDLE_SIZE, CONNECTION_HANDLE_SIZE);
+            bool clickedOnOutputHandle = outputHandleRect.Contains(mousePos);
+            
+            // Check if click is on the input handle (red dot) for this specific connection
+            Vector2 toNodePos = to.position + panOffset;
+            Vector2 inputHandlePos = toNodePos + new Vector2(0, NODE_HEIGHT / 2);
+            Rect inputHandleRect = new Rect(inputHandlePos.x - CONNECTION_HANDLE_SIZE / 2, 
+                                           inputHandlePos.y - CONNECTION_HANDLE_SIZE / 2, 
+                                           CONNECTION_HANDLE_SIZE, CONNECTION_HANDLE_SIZE);
+            bool clickedOnInputHandle = inputHandleRect.Contains(mousePos);
+            
+            // Only select if clicking on the line itself, not on the handles
+            if (!clickedOnOutputHandle && !clickedOnInputHandle)
+            {
+                // Check if click is near the line segment (not just near endpoints)
+                float distanceToLine = DistanceToLineSegment(mousePos, fromPos, toPos);
+                
+                // Also check that the click is actually along the line segment, not just near the endpoints
+                // Calculate the closest point on the line segment
+                Vector2 line = toPos - fromPos;
+                float lineLength = line.magnitude;
+                if (lineLength > 0.001f)
+                {
+                    Vector2 lineNormalized = line / lineLength;
+                    Vector2 pointToStart = mousePos - fromPos;
+                    float t = Vector2.Dot(pointToStart, lineNormalized);
+                    
+                    // Only consider clicks that are actually along the line segment (not too close to endpoints)
+                    // Exclude a buffer zone near the handles
+                    float handleBuffer = CONNECTION_HANDLE_SIZE * 1.5f;
+                    if (t > handleBuffer && t < lineLength - handleBuffer && distanceToLine < 15f)
+                    {
+                        selectedConnectionFromId = from.id;
+                        selectedConnectionToId = to.id;
+                        selectedNode = null; // Deselect node when selecting connection
+                        connectingFromNode = null; // Deselect any in-progress connection
+                        isConnecting = false;
+                        GUI.changed = true;
+                        Event.current.Use();
+                    }
+                }
+            }
+        }
         
         // Right-click to delete (old behavior preserved)
         Vector2 midPoint = (fromPos + toPos) / 2;
@@ -599,14 +635,32 @@ public class SkillTreeEditor : EditorWindow
             e.Use();
         }
         
-        // Deselect connection on background click
-        if (e.type == EventType.MouseDown && e.button == 0 && e.clickCount == 1)
+        // Handle node and connection deletion with Delete key
+        if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Delete)
+        {
+            if (selectedNode != null)
+            {
+                DeleteNode(selectedNode);
+                e.Use();
+            }
+            else if (!string.IsNullOrEmpty(selectedConnectionFromId) && !string.IsNullOrEmpty(selectedConnectionToId))
+            {
+                skillTree.RemovePrerequisite(selectedConnectionFromId, selectedConnectionToId);
+                selectedConnectionFromId = null;
+                selectedConnectionToId = null;
+                GUI.changed = true;
+                e.Use();
+            }
+        }
+        
+        // Deselect everything on background click (single click)
+        if (e.type == EventType.MouseDown && e.button == 0)
         {
             // Check if clicking on background (not on any node or connection)
             bool clickedOnNode = false;
             bool clickedOnConnection = false;
             
-            // Check nodes
+            // Check nodes (including handles)
             foreach (var node in skillTree.nodes)
             {
                 Vector2 nodePos = node.position + panOffset;
@@ -647,11 +701,20 @@ public class SkillTreeEditor : EditorWindow
                             Vector2 fromPos = prereqNode.position + panOffset + new Vector2(NODE_WIDTH, NODE_HEIGHT / 2);
                             Vector2 toPos = node.position + panOffset + new Vector2(0, NODE_HEIGHT / 2);
                             float distanceToLine = DistanceToLineSegment(e.mousePosition, fromPos, toPos);
-                            float clickableDistance = CONNECTION_LINE_WIDTH * 2f; // Match the clickable area
-                            if (distanceToLine < clickableDistance)
+                            // Exclude clicks near handles
+                            Vector2 line = toPos - fromPos;
+                            float lineLength = line.magnitude;
+                            if (lineLength > 0.001f)
                             {
-                                clickedOnConnection = true;
-                                break;
+                                Vector2 lineNormalized = line / lineLength;
+                                Vector2 pointToStart = e.mousePosition - fromPos;
+                                float t = Vector2.Dot(pointToStart, lineNormalized);
+                                float handleBuffer = CONNECTION_HANDLE_SIZE * 1.5f;
+                                if (t > handleBuffer && t < lineLength - handleBuffer && distanceToLine < 20f)
+                                {
+                                    clickedOnConnection = true;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -659,13 +722,14 @@ public class SkillTreeEditor : EditorWindow
                 }
             }
             
-            // If clicking on background, deselect everything
+            // If clicking on background, deselect everything (don't consume event so node selection can still work)
             if (!clickedOnNode && !clickedOnConnection && !isConnecting && !isPanning)
             {
                 selectedConnectionFromId = null;
                 selectedConnectionToId = null;
-                selectedNode = null; // Also deselect nodes
+                selectedNode = null; // Deselect nodes
                 GUI.changed = true;
+                // Don't consume event - let other handlers process it if needed
             }
         }
     }
