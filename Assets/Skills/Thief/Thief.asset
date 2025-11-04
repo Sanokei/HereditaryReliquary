@@ -12,6 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cae2d15c4e5bda54ea0ed65d5ac9950a, type: 3}
   m_Name: Thief
   m_EditorClassIdentifier: Assembly-CSharp::SkillTree
-  treeName: New Skill Tree
   baseSkillType: 0
-  nodes: []
+  nodes:
+  - id: 2b5ac564-ebcd-47bf-9df3-06d2594b7dea
+    skill: {fileID: 0}
+    position: {x: 248, y: 380}
+    prerequisites: []
+  - id: 82a67abd-0048-4e1f-bfee-07493895732b
+    skill: {fileID: 0}
+    position: {x: 655, y: 431}
+    prerequisites:
+    - 2b5ac564-ebcd-47bf-9df3-06d2594b7dea

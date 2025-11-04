@@ -32,7 +32,10 @@ public class Skill : ScriptableObject, ISkill
     [Range(1, 100)]
     public int skillPointsRequired = 1;
     
-    [Header("Effects")]
+    [Header("Skill Graph")]
+    [SerializeField, HideInInspector] private SkillGraph skillGraph;
+    
+    [Header("Effects (Legacy - Deprecated)")]
     [SerializeField] private SkillEffect[] effects = new SkillEffect[0];
     
     // ISkill implementation
@@ -44,9 +47,18 @@ public class Skill : ScriptableObject, ISkill
     /// </summary>
     public virtual void Perform(IActor performer)
     {
+        // Use graph-based system if available
+        if (skillGraph != null)
+        {
+            SkillGraphExecutor.Execute(skillGraph, performer);
+            Debug.Log($"{skillName} performed by {performer.Name}");
+            return;
+        }
+        
+        // Fall back to legacy effects system
         if (effects == null || effects.Length == 0)
         {
-            Debug.Log($"{skillName} performed by {performer.Name}, but has no effects.");
+            Debug.Log($"{skillName} performed by {performer.Name}, but has no effects or graph.");
             return;
         }
         
@@ -62,13 +74,28 @@ public class Skill : ScriptableObject, ISkill
     }
     
     /// <summary>
-    /// Gets all effects of this skill
+    /// Gets the skill graph
     /// </summary>
+    public SkillGraph GetSkillGraph() => skillGraph;
+    
+    /// <summary>
+    /// Sets the skill graph
+    /// </summary>
+    public void SetSkillGraph(SkillGraph graph)
+    {
+        skillGraph = graph;
+    }
+    
+    /// <summary>
+    /// Gets all effects of this skill (legacy system)
+    /// </summary>
+    [System.Obsolete("Use SkillGraph instead. This method is for backward compatibility only.")]
     public SkillEffect[] GetEffects() => effects;
     
     /// <summary>
-    /// Sets the effects for this skill
+    /// Sets the effects for this skill (legacy system)
     /// </summary>
+    [System.Obsolete("Use SkillGraph instead. This method is for backward compatibility only.")]
     public void SetEffects(SkillEffect[] newEffects)
     {
         effects = newEffects;
@@ -111,7 +138,26 @@ public class Skill : ScriptableObject, ISkill
         pointsLabel.style.marginTop = 5;
         rootElement.Add(pointsLabel);
         
-        // Effects
+        // Skill Graph
+        if (skillGraph != null)
+        {
+            var graphContainer = new VisualElement();
+            graphContainer.name = "GraphContainer";
+            graphContainer.style.marginTop = 10;
+            
+            var graphHeader = new Label("Skill Graph:");
+            graphHeader.style.fontSize = 14;
+            graphHeader.style.unityFontStyleAndWeight = FontStyle.Bold;
+            graphContainer.Add(graphHeader);
+            
+            var graphLabel = new Label($"• {skillGraph.GraphName} ({skillGraph.Nodes.Count} nodes)");
+            graphLabel.style.marginLeft = 10;
+            graphContainer.Add(graphLabel);
+            
+            rootElement.Add(graphContainer);
+        }
+        
+        // Effects (Legacy)
         if (effects != null && effects.Length > 0)
         {
             var effectsContainer = new VisualElement();
