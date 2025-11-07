@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
+using SkillSystem.Core;
 
 public class SkillTreeEditor : EditorWindow
 {
@@ -82,8 +83,8 @@ public class SkillTreeEditor : EditorWindow
         if (skillTree != null)
         {
             EditorGUILayout.LabelField("Base Type:", GUILayout.Width(70));
-            skillTree.baseSkillType = (SkillType)EditorGUILayout.EnumPopup(skillTree.baseSkillType, GUILayout.Width(100));
-            
+            selectedNode.skill.type = (SSSkill.SkillType)EditorGUILayout.EnumPopup(selectedNode.GetSkill().type, GUILayout.Width(100));
+
             if (GUILayout.Button("Add Node", EditorStyles.toolbarButton))
             {
                 AddNode();
@@ -196,33 +197,29 @@ public class SkillTreeEditor : EditorWindow
         EditorGUILayout.BeginVertical();
         
         // Skill reference
-        node.skill = (Skill)EditorGUILayout.ObjectField(node.skill, typeof(Skill), false);
+        node.skill = (SSSkill)EditorGUILayout.ObjectField(node.skill, typeof(SSSkill), false);
         
         if (node.skill != null)
         {
-            ISkill skillInterface = node.GetSkill();
-            EditorGUILayout.LabelField(skillInterface.SkillName, EditorStyles.boldLabel);
+            SSSkill skillInterface = node.GetSkill();
+            EditorGUILayout.LabelField(skillInterface.skillName, EditorStyles.boldLabel);
             
             // Skill points required (more prominent with slider)
             EditorGUILayout.Space(5);
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField("Skill Points:", GUILayout.Width(80));
             EditorGUI.BeginChangeCheck();
-            node.skill.skillPointsRequired = EditorGUILayout.IntSlider(node.skill.skillPointsRequired, 1, 100);
+            // node.skill.skillPointsRequired = EditorGUILayout.IntSlider(node.skill.skillPointsRequired, 1, 100);
             if (EditorGUI.EndChangeCheck())
             {
                 GUI.changed = true;
             }
             EditorGUILayout.EndHorizontal();
-            
-            // Show cooldown info if applicable
-            if (skillInterface is ICooldownSkill cooldownSkill)
-            {
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Cooldown:", GUILayout.Width(50));
-                EditorGUILayout.LabelField($"{cooldownSkill.CooldownDuration}s", GUILayout.Width(50));
-                EditorGUILayout.EndHorizontal();
-            }
+
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Cooldown:", GUILayout.Width(50));
+            EditorGUILayout.LabelField($"{selectedNode.GetSkill().skillCooldown}s", GUILayout.Width(50));
+            EditorGUILayout.EndHorizontal();
         }
         else
         {

@@ -1,11 +1,12 @@
 using UnityEngine;
 using System.Collections.Generic;
+using SkillSystem.Core;
 
 [System.Serializable]
 public class SkillNode
 {
     public string id;
-    public Skill skill; // Public for editor access, still using Skill as the concrete type for ScriptableObject reference
+    public SSSkill skill; // Public for editor access, still using Skill as the concrete type for ScriptableObject reference
     public Vector2 position;
     public List<string> prerequisites = new List<string>(); // IDs of prerequisite nodes
     
@@ -22,18 +23,13 @@ public class SkillNode
     }
     
     /// <summary>
-    /// Gets the skill as ISkill interface
+    /// Gets the skill as SSSkill interface
     /// </summary>
-    public ISkill GetSkill() => skill;
-    
-    /// <summary>
-    /// Gets the skill as the concrete Skill type
-    /// </summary>
-    public Skill GetSkillAsset() => skill;
+    public SSSkill GetSkill() => skill;
     
     /// <summary>
     /// Sets the skill asset
     /// </summary>
-    public void SetSkill(Skill newSkill) => skill = newSkill;
+    public void SetSkill(SSSkill newSkill) => skill = newSkill;
 }
 

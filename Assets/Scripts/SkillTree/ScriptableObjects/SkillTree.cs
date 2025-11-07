@@ -3,10 +3,7 @@ using System.Collections.Generic;
 
 [CreateAssetMenu(fileName = "New Skill Tree", menuName = "Adventurers/Skill Tree")]
 public class SkillTree : ScriptableObject
-{
-    [Header("Tree Information")]
-    public SkillType baseSkillType;
-    
+{   
     [Header("Nodes")]
     public List<SkillNode> nodes = new List<SkillNode>();
     

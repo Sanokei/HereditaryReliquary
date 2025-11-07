@@ -1,0 +1,15 @@
+﻿<Solution>
+  <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="Assembly-CSharp-firstpass.csproj" />
+  <Project Path="LeanCommon.csproj" />
+  <Project Path="LeanTransition.csproj" />
+  <Project Path="Ink-Libraries.csproj" />
+  <Project Path="InkEditor.csproj" />
+  <Project Path="Assembly-CSharp-Editor.csproj" />
+  <Project Path="CW.Common.csproj" />
+  <Project Path="LeanGUI.csproj" />
+  <Project Path="Assembly-CSharp-Editor-firstpass.csproj" />
+  <Project Path="LeanPool.csproj" />
+  <Project Path="SimpleMan.CoroutineExtensions.csproj" />
+  <Project Path="LeanTransition.Editor.csproj" />
+</Solution>
