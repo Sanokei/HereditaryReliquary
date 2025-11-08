@@ -1,112 +1,114 @@
-
 using UnityEngine;
 
-public class PreviewSystem : MonoBehaviour
+namespace GridBuilder.Core
 {
-    [SerializeField]
-    private float previewYOffset = 0.06f;
-
-    [SerializeField]
-    private GameObject cellIndicator;
-    private GameObject previewObject;
-
-    [SerializeField]
-    private Material previewMaterialPrefab;
-    private Material previewMaterialInstance;
-
-    private Renderer cellIndicatorRenderer;
-
-    private void Start()
+    public class PreviewSystem : MonoBehaviour
     {
-        previewMaterialInstance = new Material(previewMaterialPrefab);
-        cellIndicator.SetActive(false);
-        cellIndicatorRenderer = cellIndicator.GetComponentInChildren<Renderer>();
-    }
+        [SerializeField]
+        private float previewYOffset = 0.06f;
 
-    public void StartShowingPlacementPreview(GameObject prefab, Vector2Int size)
-    {
-        previewObject = Instantiate(prefab);
-        PreparePreview(previewObject);
-        PrepareCursor(size);
-        cellIndicator.SetActive(true);
-    }
+        [SerializeField]
+        private GameObject cellIndicator;
+        private GameObject previewObject;
 
-    private void PrepareCursor(Vector2Int size)
-    {
-        if(size.x > 0 || size.y > 0)
+        [SerializeField]
+        private Material previewMaterialPrefab;
+        private Material previewMaterialInstance;
+
+        private Renderer cellIndicatorRenderer;
+
+        private void Start()
         {
-            cellIndicator.transform.localScale = new Vector3(size.x, 1, size.y);
-            cellIndicatorRenderer.material.mainTextureScale = size;
+            previewMaterialInstance = new Material(previewMaterialPrefab);
+            cellIndicator.SetActive(false);
+            cellIndicatorRenderer = cellIndicator.GetComponentInChildren<Renderer>();
         }
-    }
 
-    private void PreparePreview(GameObject previewObject)
-    {
-        Renderer[] renderers = previewObject.GetComponentsInChildren<Renderer>();
-        foreach(Renderer renderer in renderers)
+        public void StartShowingPlacementPreview(GameObject prefab, Vector2Int size)
         {
-            Material[] materials = renderer.materials;
-            for (int i = 0; i < materials.Length; i++)
+            previewObject = Instantiate(prefab);
+            PreparePreview(previewObject);
+            PrepareCursor(size);
+            cellIndicator.SetActive(true);
+        }
+
+        private void PrepareCursor(Vector2Int size)
+        {
+            if (size.x > 0 || size.y > 0)
             {
-                materials[i] = previewMaterialInstance;
+                cellIndicator.transform.localScale = new Vector3(size.x, 1, size.y);
+                cellIndicatorRenderer.material.mainTextureScale = size;
             }
-            renderer.materials = materials;
         }
-    }
 
-    public void StopShowingPreview()
-    {
-        cellIndicator.SetActive(false );
-        if(previewObject!= null)
-            Destroy(previewObject );
-    }
-
-    public void UpdatePosition(Vector3 position, bool validity)
-    {
-        if(previewObject != null)
+        private void PreparePreview(GameObject previewObject)
         {
-            MovePreview(position);
-            ApplyFeedbackToPreview(validity);
-
+            Renderer[] renderers = previewObject.GetComponentsInChildren<Renderer>();
+            foreach (Renderer renderer in renderers)
+            {
+                Material[] materials = renderer.materials;
+                for (int i = 0; i < materials.Length; i++)
+                {
+                    materials[i] = previewMaterialInstance;
+                }
+                renderer.materials = materials;
+            }
         }
 
-        MoveCursor(position);
-        ApplyFeedbackToCursor(validity);
-    }
+        public void StopShowingPreview()
+        {
+            cellIndicator.SetActive(false);
+            if (previewObject != null)
+                Destroy(previewObject);
+        }
 
-    private void ApplyFeedbackToPreview(bool validity)
-    {
-        Color c = validity ? Color.white : Color.red;
-        
-        c.a = 0.5f;
-        previewMaterialInstance.color = c;
-    }
+        public void UpdatePosition(Vector3 position, bool validity)
+        {
+            if (previewObject != null)
+            {
+                MovePreview(position);
+                ApplyFeedbackToPreview(validity);
 
-    private void ApplyFeedbackToCursor(bool validity)
-    {
-        Color c = validity ? Color.white : Color.red;
+            }
 
-        c.a = 0.5f;
-        cellIndicatorRenderer.material.color = c;
-    }
+            MoveCursor(position);
+            ApplyFeedbackToCursor(validity);
+        }
 
-    private void MoveCursor(Vector3 position)
-    {
-        cellIndicator.transform.position = position;
-    }
+        private void ApplyFeedbackToPreview(bool validity)
+        {
+            Color c = validity ? Color.white : Color.red;
 
-    private void MovePreview(Vector3 position)
-    {
-        previewObject.transform.position = new Vector3(
-            position.x, 
-            position.y + previewYOffset, 
-            position.z);
-    }
+            c.a = 0.5f;
+            previewMaterialInstance.color = c;
+        }
 
-    internal void StartShowingRemovePreview()
-    {
-        cellIndicator.SetActive(true);
-        PrepareCursor(Vector2Int.one);
-        ApplyFeedbackToCursor(false);
+        private void ApplyFeedbackToCursor(bool validity)
+        {
+            Color c = validity ? Color.white : Color.red;
+
+            c.a = 0.5f;
+            cellIndicatorRenderer.material.color = c;
+        }
+
+        private void MoveCursor(Vector3 position)
+        {
+            cellIndicator.transform.position = position;
+        }
+
+        private void MovePreview(Vector3 position)
+        {
+            previewObject.transform.position = new Vector3(
+                position.x,
+                position.y + previewYOffset,
+                position.z);
+        }
+
+        internal void StartShowingRemovePreview()
+        {
+            cellIndicator.SetActive(true);
+            PrepareCursor(Vector2Int.one);
+            ApplyFeedbackToCursor(false);
+        }
     }
 }
