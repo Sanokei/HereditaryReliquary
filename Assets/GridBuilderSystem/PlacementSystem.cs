@@ -3,47 +3,67 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace GridBuilder.Core
 {
     public class PlacementSystem : MonoBehaviour
     {
-        [SerializeField]
-        private InputManager inputManager;
-        [SerializeField]
-        private Grid grid;
+        [SerializeField] Grid grid;
 
-        [SerializeField]
-        private ObjectsDatabaseSO database;
+        [SerializeField] ObjectsDatabaseSO database;
 
-        [SerializeField]
-        private GameObject gridVisualization;
+        [SerializeField] GameObject gridVisualization;
 
-        [SerializeField]
-        private AudioClip correctPlacementClip, wrongPlacementClip;
-        [SerializeField]
-        private AudioSource source;
+        [SerializeField] AudioClip correctPlacementClip, wrongPlacementClip;
+        [SerializeField] AudioSource source;
 
-        private GridData floorData, furnitureData;
+        GridData floorData, furnitureData;
 
-        [SerializeField]
-        private PreviewSystem preview;
+        [SerializeField] PreviewSystem preview;
 
-        private Vector3Int lastDetectedPosition = Vector3Int.zero;
+        Vector3Int lastDetectedPosition = Vector3Int.zero;
 
-        [SerializeField]
-        private ObjectPlacer objectPlacer;
+        [SerializeField] ObjectPlacer objectPlacer;
 
         IBuildingState buildingState;
 
-        [SerializeField]
-        private SoundFeedback soundFeedback;
+        [SerializeField] SoundFeedback soundFeedback;
 
-        private void Start()
+        [SerializeField] Camera sceneCamera;
+
+        Vector3 lastPosition;
+
+        [SerializeField] LayerMask placementLayermask;
+
+        public event Action OnClicked, OnExit;
+
+        void Awake()
         {
             gridVisualization.SetActive(false);
             floorData = new();
             furnitureData = new();
+        }
+
+        void Start()
+        {
+            StartPlacement(0);
+        }
+        void Update()
+        {
+            if (buildingState == null)
+                return;
+            Vector3 mousePosition = GetSelectedMapPosition();
+            Vector3Int gridPosition = grid.WorldToCell(mousePosition);
+            if (lastDetectedPosition != gridPosition)
+            {
+                buildingState.UpdateState(gridPosition);
+                lastDetectedPosition = gridPosition;
+            }
+            if (Input.GetMouseButtonDown(0))
+                OnClicked?.Invoke();
+            if (Input.GetKeyDown(KeyCode.Escape))
+                OnExit?.Invoke();
         }
 
         public void StartPlacement(int ID)
@@ -58,8 +78,8 @@ namespace GridBuilder.Core
                                             furnitureData,
                                             objectPlacer,
                                             soundFeedback);
-            inputManager.OnClicked += PlaceStructure;
-            inputManager.OnExit += StopPlacement;
+            OnClicked += PlaceStructure;
+            OnExit += StopPlacement;
         }
 
         public void StartRemoving()
@@ -67,24 +87,24 @@ namespace GridBuilder.Core
             StopPlacement();
             gridVisualization.SetActive(true);
             buildingState = new RemovingState(grid, preview, floorData, furnitureData, objectPlacer, soundFeedback);
-            inputManager.OnClicked += PlaceStructure;
-            inputManager.OnExit += StopPlacement;
+            OnClicked += PlaceStructure;
+            OnExit += StopPlacement;
         }
 
-        private void PlaceStructure()
+        void PlaceStructure()
         {
-            if (inputManager.IsPointerOverUI())
+            if (IsPointerOverUI())
             {
                 return;
             }
-            Vector3 mousePosition = inputManager.GetSelectedMapPosition();
+            Vector3 mousePosition = GetSelectedMapPosition();
             Vector3Int gridPosition = grid.WorldToCell(mousePosition);
 
             buildingState.OnAction(gridPosition);
 
         }
 
-        //private bool CheckPlacementValidity(Vector3Int gridPosition, int selectedObjectIndex)
+        //bool CheckPlacementValidity(Vector3Int gridPosition, int selectedObjectIndex)
         //{
         //    GridData selectedData = database.objectsData[selectedObjectIndex].ID == 0 ? 
         //        floorData : 
@@ -93,31 +113,33 @@ namespace GridBuilder.Core
         //    return selectedData.CanPlaceObejctAt(gridPosition, database.objectsData[selectedObjectIndex].Size);
         //}
 
-        private void StopPlacement()
+        void StopPlacement()
         {
             soundFeedback.PlaySound(SoundType.Click);
             if (buildingState == null)
                 return;
             gridVisualization.SetActive(false);
             buildingState.EndState();
-            inputManager.OnClicked -= PlaceStructure;
-            inputManager.OnExit -= StopPlacement;
+            OnClicked -= PlaceStructure;
+            OnExit -= StopPlacement;
             lastDetectedPosition = Vector3Int.zero;
             buildingState = null;
         }
 
-        private void Update()
+        public Vector3 GetSelectedMapPosition()
         {
-            if (buildingState == null)
-                return;
-            Vector3 mousePosition = inputManager.GetSelectedMapPosition();
-            Vector3Int gridPosition = grid.WorldToCell(mousePosition);
-            if (lastDetectedPosition != gridPosition)
+            Vector3 mousePos = Input.mousePosition;
+            mousePos.z = sceneCamera.nearClipPlane;
+            Ray ray = sceneCamera.ScreenPointToRay(mousePos);
+            RaycastHit hit;
+            if (Physics.Raycast(ray, out hit, Mathf.Infinity, placementLayermask))
             {
-                buildingState.UpdateState(gridPosition);
-                lastDetectedPosition = gridPosition;
+                lastPosition = hit.point;
             }
-
+            return lastPosition;
         }
+
+        public bool IsPointerOverUI()
+            => EventSystem.current.IsPointerOverGameObject();
     }
 }

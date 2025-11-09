@@ -63,7 +63,7 @@ namespace GridBuilder.Core
             }
             soundFeedback.PlaySound(SoundType.Place);
             int index = objectPlacer.PlaceObject(database.objectsData[selectedObjectIndex].Prefab,
-                grid.CellToWorld(gridPosition));
+                grid.GetCellCenterWorld(gridPosition));
 
             GridData selectedData = database.objectsData[selectedObjectIndex].ID == 0 ?
                 floorData :
@@ -73,7 +73,7 @@ namespace GridBuilder.Core
                 database.objectsData[selectedObjectIndex].ID,
                 index);
 
-            previewSystem.UpdatePosition(grid.CellToWorld(gridPosition), false);
+            previewSystem.UpdatePosition(grid.GetCellCenterWorld(gridPosition), false);
         }
 
         private bool CheckPlacementValidity(Vector3Int gridPosition, int selectedObjectIndex)
@@ -89,7 +89,7 @@ namespace GridBuilder.Core
         {
             bool placementValidity = CheckPlacementValidity(gridPosition, selectedObjectIndex);
 
-            previewSystem.UpdatePosition(grid.CellToWorld(gridPosition), placementValidity);
+            previewSystem.UpdatePosition(grid.GetCellCenterWorld(gridPosition), placementValidity);
         }
     }
 

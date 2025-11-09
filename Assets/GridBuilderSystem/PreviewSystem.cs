@@ -37,7 +37,7 @@ namespace GridBuilder.Core
             if (size.x > 0 || size.y > 0)
             {
                 cellIndicator.transform.localScale = new Vector3(size.x, 1, size.y);
-                cellIndicatorRenderer.material.mainTextureScale = size;
+                cellIndicatorRenderer.sharedMaterial.mainTextureScale = size;
             }
         }
 
@@ -46,12 +46,12 @@ namespace GridBuilder.Core
             Renderer[] renderers = previewObject.GetComponentsInChildren<Renderer>();
             foreach (Renderer renderer in renderers)
             {
-                Material[] materials = renderer.materials;
+                Material[] materials = renderer.sharedMaterials;
                 for (int i = 0; i < materials.Length; i++)
                 {
                     materials[i] = previewMaterialInstance;
                 }
-                renderer.materials = materials;
+                renderer.sharedMaterials = materials;
             }
         }
 
@@ -77,7 +77,7 @@ namespace GridBuilder.Core
 
         private void ApplyFeedbackToPreview(bool validity)
         {
-            Color c = validity ? Color.white : Color.red;
+            Color c = validity ? Color.white : Color.grey;
 
             c.a = 0.5f;
             previewMaterialInstance.color = c;
@@ -85,15 +85,18 @@ namespace GridBuilder.Core
 
         private void ApplyFeedbackToCursor(bool validity)
         {
-            Color c = validity ? Color.white : Color.red;
+            Color c = validity ? Color.green : Color.red;
 
             c.a = 0.5f;
-            cellIndicatorRenderer.material.color = c;
+            cellIndicatorRenderer.sharedMaterial.color = c;
         }
 
         private void MoveCursor(Vector3 position)
         {
-            cellIndicator.transform.position = position;
+            cellIndicator.transform.position = new Vector3(
+                position.x,
+                0.01f,
+                position.z);
         }
 
         private void MovePreview(Vector3 position)
