@@ -8,9 +8,15 @@ namespace GridBuilder.Core
     public class GridData
     {
         Dictionary<Vector3Int, PlacementData> placedObjects = new();
+        private BoundsInt? gridBounds = null;
+
+        public void SetGridBounds(BoundsInt bounds)
+        {
+            gridBounds = bounds;
+        }
 
         public void AddObjectAt(Vector3Int gridPosition,
-                                Vector2Int objectSize,
+                                Vector3Int objectSize,
                                 int ID,
                                 int placedObjectIndex)
         {
@@ -24,22 +30,37 @@ namespace GridBuilder.Core
             }
         }
 
-        private List<Vector3Int> CalculatePositions(Vector3Int gridPosition, Vector2Int objectSize)
+        private List<Vector3Int> CalculatePositions(Vector3Int gridPosition, Vector3Int objectSize)
         {
             List<Vector3Int> returnVal = new();
             for (int x = 0; x < objectSize.x; x++)
             {
                 for (int y = 0; y < objectSize.y; y++)
                 {
-                    returnVal.Add(gridPosition + new Vector3Int(x, 0, y));
+                    for (int z = 0; z < objectSize.z; z++)
+                    {
+                        returnVal.Add(gridPosition + new Vector3Int(x, y, z));
+                    }
                 }
             }
             return returnVal;
         }
 
-        public bool CanPlaceObejctAt(Vector3Int gridPosition, Vector2Int objectSize)
+        public bool CanPlaceObejctAt(Vector3Int gridPosition, Vector3Int objectSize)
         {
             List<Vector3Int> positionToOccupy = CalculatePositions(gridPosition, objectSize);
+            
+            // Check if all positions are within grid bounds (if bounds are set)
+            if (gridBounds.HasValue)
+            {
+                foreach (var pos in positionToOccupy)
+                {
+                    if (!gridBounds.Value.Contains(pos))
+                        return false;
+                }
+            }
+            
+            // Check if any positions are already occupied
             foreach (var pos in positionToOccupy)
             {
                 if (placedObjects.ContainsKey(pos))

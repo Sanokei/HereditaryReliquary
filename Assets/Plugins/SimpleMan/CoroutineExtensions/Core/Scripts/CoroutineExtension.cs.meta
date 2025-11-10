@@ -9,3 +9,10 @@ MonoImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 179211
+  packageName: Coroutine Extensions
+  packageVersion: 1.2
+  assetPath: Assets/Plugins/SimpleMan/CoroutineExtensions/Core/Scripts/CoroutineExtension.cs
+  uploadId: 462349

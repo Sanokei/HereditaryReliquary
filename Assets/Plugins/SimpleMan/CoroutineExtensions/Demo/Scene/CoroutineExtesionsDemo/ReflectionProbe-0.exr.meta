@@ -92,3 +92,10 @@ TextureImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 179211
+  packageName: Coroutine Extensions
+  packageVersion: 1.2
+  assetPath: Assets/Plugins/SimpleMan/CoroutineExtensions/Demo/Scene/CoroutineExtesionsDemo/ReflectionProbe-0.exr
+  uploadId: 462349

@@ -835,7 +835,7 @@ PlayerSettings:
     PS5: DOTWEEN
     QNX: DOTWEEN
     ReservedCFE: DOTWEEN
-    Standalone: INK_RUNTIME;INK_EDITOR;DOTWEEN
+    Standalone: INK_RUNTIME;INK_EDITOR;DOTWEEN;MODULAR_3D_TEXT
     VisionOS: DOTWEEN
     WebGL: DOTWEEN
     Windows Store Apps: DOTWEEN

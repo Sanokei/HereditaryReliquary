@@ -864,7 +864,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 34dceebc85e30b6428a359bd3a07095b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.PreviewSystem
-  previewYOffset: 0.06
+  previewYOffset: 0
   cellIndicator: {fileID: 6442480874794939870}
   previewMaterialPrefab: {fileID: 2100000, guid: 3e04babce0067c14d97641d7834790f1, type: 2}
 --- !u!4 &1307109930

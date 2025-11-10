@@ -6,3 +6,10 @@ NativeFormatImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 144107
+  packageName: Lean Transition
+  packageVersion: 2.1.0
+  assetPath: Assets/Plugins/CW/LeanTransition/Required/Methods/Graphic/UnityEngine.UI.Graphic.asset
+  uploadId: 653644

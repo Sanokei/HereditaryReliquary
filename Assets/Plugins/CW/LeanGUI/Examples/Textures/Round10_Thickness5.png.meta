@@ -97,3 +97,10 @@ TextureImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 72138
+  packageName: Lean GUI
+  packageVersion: 2.1.0
+  assetPath: Assets/Plugins/CW/LeanGUI/Examples/Textures/Round10_Thickness5.png
+  uploadId: 653659

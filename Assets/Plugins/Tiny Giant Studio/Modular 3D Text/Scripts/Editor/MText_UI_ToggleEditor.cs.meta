@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 481f2c726cae7ff47a5340f64570b18d
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 159508
+  packageName: Modular 3D Text - In-Game 3D UI System
+  packageVersion: 3.3.1
+  assetPath: Assets/Plugins/Tiny Giant Studio/Modular 3D Text/Scripts/Editor/MText_UI_ToggleEditor.cs
+  uploadId: 565536
