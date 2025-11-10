@@ -28,7 +28,7 @@ namespace GridBuilder.Core
             this.furnitureData = furnitureData;
             this.objectPlacer = objectPlacer;
             this.soundFeedback = soundFeedback;
-            previewSystem.StartShowingRemovePreview();
+            previewSystem.StartShowingRemovePreview(grid);
         }
 
         public void EndState()
@@ -39,11 +39,11 @@ namespace GridBuilder.Core
         public void OnAction(Vector3Int gridPosition)
         {
             GridData selectedData = null;
-            if (furnitureData.CanPlaceObejctAt(gridPosition, Vector2Int.one) == false)
+            if (furnitureData.CanPlaceObejctAt(gridPosition, Vector3Int.one) == false)
             {
                 selectedData = furnitureData;
             }
-            else if (floorData.CanPlaceObejctAt(gridPosition, Vector2Int.one) == false)
+            else if (floorData.CanPlaceObejctAt(gridPosition, Vector3Int.one) == false)
             {
                 selectedData = floorData;
             }
@@ -68,14 +68,14 @@ namespace GridBuilder.Core
 
         private bool CheckIfSelectionIsValid(Vector3Int gridPosition)
         {
-            return !(furnitureData.CanPlaceObejctAt(gridPosition, Vector2Int.one) &&
-                floorData.CanPlaceObejctAt(gridPosition, Vector2Int.one));
+            return !(furnitureData.CanPlaceObejctAt(gridPosition, Vector3Int.one) &&
+                floorData.CanPlaceObejctAt(gridPosition, Vector3Int.one));
         }
 
         public void UpdateState(Vector3Int gridPosition)
         {
             bool validity = CheckIfSelectionIsValid(gridPosition);
-            previewSystem.UpdatePosition(grid.CellToWorld(gridPosition), validity);
+            previewSystem.UpdatePosition(grid.GetCellCenterWorld(gridPosition), validity);
         }
     }
 }

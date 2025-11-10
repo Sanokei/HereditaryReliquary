@@ -5,7 +5,7 @@ namespace GridBuilder.Core
     public class PreviewSystem : MonoBehaviour
     {
         [SerializeField]
-        private float previewYOffset = 0.06f;
+        private float previewYOffset = 0.00f;
 
         [SerializeField]
         private GameObject cellIndicator;
@@ -16,6 +16,8 @@ namespace GridBuilder.Core
         private Material previewMaterialInstance;
 
         private Renderer cellIndicatorRenderer;
+        private Vector3Int currentObjectSize = Vector3Int.one;
+        private Grid grid;
 
         private void Start()
         {
@@ -24,25 +26,30 @@ namespace GridBuilder.Core
             cellIndicatorRenderer = cellIndicator.GetComponentInChildren<Renderer>();
         }
 
-        public void StartShowingPlacementPreview(GameObject prefab, Vector2Int size)
+        public void StartShowingPlacementPreview(GameObject prefab, Vector3Int size, Grid grid)
         {
+            this.grid = grid;
+            currentObjectSize = size;
             previewObject = Instantiate(prefab);
             PreparePreview(previewObject);
             PrepareCursor(size);
             cellIndicator.SetActive(true);
         }
 
-        private void PrepareCursor(Vector2Int size)
+        private void PrepareCursor(Vector3Int size)
         {
-            if (size.x > 0 || size.y > 0)
+            if (size.x > 0 || size.y > 0 || size.z > 0)
             {
-                cellIndicator.transform.localScale = new Vector3(size.x, 1, size.y);
-                cellIndicatorRenderer.sharedMaterial.mainTextureScale = size;
+                // Cell indicator is a flat plane on the ground, so only scale X and Z (keep Y at 1)
+                // Because it is a quad it uses X and Y instead of Z
+                cellIndicator.transform.localScale = new Vector3(size.x, size.z, 1);
+                cellIndicatorRenderer.sharedMaterial.mainTextureScale = new Vector2(size.x, size.z);
             }
         }
 
         private void PreparePreview(GameObject previewObject)
         {
+            previewObject.transform.localScale = previewObject.transform.localScale * 1.01f;
             Renderer[] renderers = previewObject.GetComponentsInChildren<Renderer>();
             foreach (Renderer renderer in renderers)
             {
@@ -77,7 +84,7 @@ namespace GridBuilder.Core
 
         private void ApplyFeedbackToPreview(bool validity)
         {
-            Color c = validity ? Color.white : Color.grey;
+            Color c = validity ? Color.white : Color.red;
 
             c.a = 0.5f;
             previewMaterialInstance.color = c;
@@ -93,6 +100,9 @@ namespace GridBuilder.Core
 
         private void MoveCursor(Vector3 position)
         {
+            // Position cell indicator at the same position as preview
+            // The position passed in already includes offset for centering multi-cell objects
+            // Cell indicator has center pivot, so it aligns correctly when positioned at the center
             cellIndicator.transform.position = new Vector3(
                 position.x,
                 0.01f,
@@ -101,16 +111,28 @@ namespace GridBuilder.Core
 
         private void MovePreview(Vector3 position)
         {
+            // Preview object pivot is likely at the corner, while cell indicator pivot is at center
+            // For multi-cell objects, we need to adjust the preview position to align with grid cells
+            // The position passed in is centered for the cell indicator (center pivot)
+            // For preview object with corner pivot, we need to offset back by half the object size
+            Vector3 cellSize = grid != null ? grid.cellSize : Vector3.one;
+            Vector3 pivotOffset = new Vector3(
+                -(currentObjectSize.x - 1) * cellSize.x * 0.5f,
+                -(currentObjectSize.y - 1) * cellSize.y * 0.5f,
+                -(currentObjectSize.z - 1) * cellSize.z * 0.5f);
+            
             previewObject.transform.position = new Vector3(
-                position.x,
-                position.y + previewYOffset,
-                position.z);
+                position.x + pivotOffset.x,
+                position.y + previewYOffset + pivotOffset.y,
+                position.z + pivotOffset.z);
         }
 
-        internal void StartShowingRemovePreview()
+        internal void StartShowingRemovePreview(Grid grid)
         {
+            this.grid = grid;
+            currentObjectSize = Vector3Int.one;
             cellIndicator.SetActive(true);
-            PrepareCursor(Vector2Int.one);
+            PrepareCursor(Vector3Int.one);
             ApplyFeedbackToCursor(false);
         }
     }

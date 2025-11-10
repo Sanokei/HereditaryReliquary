@@ -40,7 +40,8 @@ namespace GridBuilder.Core
             {
                 previewSystem.StartShowingPlacementPreview(
                     database.objectsData[selectedObjectIndex].Prefab,
-                    database.objectsData[selectedObjectIndex].Size);
+                    database.objectsData[selectedObjectIndex].Size,
+                    grid);
             }
             else
                 throw new System.Exception($"No object with ID {iD}");
@@ -62,8 +63,31 @@ namespace GridBuilder.Core
                 return;
             }
             soundFeedback.PlaySound(SoundType.Place);
+            
+            // Calculate placement position to match preview exactly
+            // Preview calculation in UpdateState: center + centerOffset
+            // Preview calculation in MovePreview: position + pivotOffset
+            // Final preview position: center + centerOffset + pivotOffset
+            // Since centerOffset = (size-1) * cellSize * 0.5 and pivotOffset = -(size-1) * cellSize * 0.5
+            // They cancel out, so preview ends up at: grid.GetCellCenterWorld(gridPosition)
+            Vector3Int objectSize = database.objectsData[selectedObjectIndex].Size;
+            Vector3 cellSize = grid.cellSize;
+            
+            Vector3 centerPosition = grid.GetCellCenterWorld(gridPosition);
+            Vector3 centerOffset = new Vector3(
+                (objectSize.x - 1) * cellSize.x * 0.5f,
+                (objectSize.y - 1) * cellSize.y * 0.5f,
+                (objectSize.z - 1) * cellSize.z * 0.5f);
+            Vector3 pivotOffset = new Vector3(
+                -(objectSize.x - 1) * cellSize.x * 0.5f,
+                -(objectSize.y - 1) * cellSize.y * 0.5f,
+                -(objectSize.z - 1) * cellSize.z * 0.5f);
+            
+            // Match preview calculation exactly: center + centerOffset + pivotOffset
+            Vector3 placementPosition = centerPosition + centerOffset + pivotOffset;
+            
             int index = objectPlacer.PlaceObject(database.objectsData[selectedObjectIndex].Prefab,
-                grid.GetCellCenterWorld(gridPosition));
+                placementPosition);
 
             GridData selectedData = database.objectsData[selectedObjectIndex].ID == 0 ?
                 floorData :
@@ -73,7 +97,9 @@ namespace GridBuilder.Core
                 database.objectsData[selectedObjectIndex].ID,
                 index);
 
-            previewSystem.UpdatePosition(grid.GetCellCenterWorld(gridPosition), false);
+            // Update preview position using the same calculation as UpdateState
+            // This ensures the preview is correctly positioned immediately after placement
+            UpdateState(gridPosition);
         }
 
         private bool CheckPlacementValidity(Vector3Int gridPosition, int selectedObjectIndex)
@@ -89,7 +115,17 @@ namespace GridBuilder.Core
         {
             bool placementValidity = CheckPlacementValidity(gridPosition, selectedObjectIndex);
 
-            previewSystem.UpdatePosition(grid.GetCellCenterWorld(gridPosition), placementValidity);
+            // Calculate position for preview - needs to account for multi-cell objects
+            // The preview system will apply the same offset to both preview and indicator
+            Vector3Int objectSize = database.objectsData[selectedObjectIndex].Size;
+            Vector3 cellSize = grid.cellSize;
+            Vector3 offset = new Vector3(
+                (objectSize.x - 1) * cellSize.x * 0.5f,
+                (objectSize.y - 1) * cellSize.y * 0.5f,
+                (objectSize.z - 1) * cellSize.z * 0.5f);
+            Vector3 previewPosition = grid.GetCellCenterWorld(gridPosition) + offset;
+            
+            previewSystem.UpdatePosition(previewPosition, placementValidity);
         }
     }
 
