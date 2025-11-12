@@ -19,7 +19,7 @@ namespace GridBuilder.Core
         private Vector3Int currentObjectSize = Vector3Int.one;
         private Grid grid;
 
-        private void Start()
+        private void Awake()
         {
             previewMaterialInstance = new Material(previewMaterialPrefab);
             cellIndicator.SetActive(false);

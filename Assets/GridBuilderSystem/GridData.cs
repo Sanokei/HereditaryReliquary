@@ -8,11 +8,15 @@ namespace GridBuilder.Core
     public class GridData
     {
         Dictionary<Vector3Int, PlacementData> placedObjects = new();
-        private BoundsInt? gridBounds = null;
+        private Vector3? gridSize = null;
+        private Vector3? cellSize = null;
+        private Vector3? anchorPoint = null;
 
-        public void SetGridBounds(BoundsInt bounds)
+        public void SetGridProperties(Vector3 gridSize, Vector3 cellSize, Vector3 anchorPoint)
         {
-            gridBounds = bounds;
+            this.gridSize = gridSize;
+            this.cellSize = cellSize;
+            this.anchorPoint = anchorPoint;
         }
 
         public void AddObjectAt(Vector3Int gridPosition,
@@ -50,16 +54,6 @@ namespace GridBuilder.Core
         {
             List<Vector3Int> positionToOccupy = CalculatePositions(gridPosition, objectSize);
             
-            // Check if all positions are within grid bounds (if bounds are set)
-            if (gridBounds.HasValue)
-            {
-                foreach (var pos in positionToOccupy)
-                {
-                    if (!gridBounds.Value.Contains(pos))
-                        return false;
-                }
-            }
-            
             // Check if any positions are already occupied
             foreach (var pos in positionToOccupy)
             {
@@ -67,6 +61,65 @@ namespace GridBuilder.Core
                     return false;
             }
             return true;
+        }
+
+        public bool IsWithinGridBounds(Vector3Int gridPosition, Vector3Int objectSize)
+        {
+            // If grid properties are not set, assume unbounded grid
+            if (!gridSize.HasValue || !anchorPoint.HasValue)
+                return true;
+
+            List<Vector3Int> positionToOccupy = CalculatePositions(gridPosition, objectSize);
+            Vector3 gridSizeValue = gridSize.Value;
+            Vector3 anchorPointValue = anchorPoint.Value;
+
+            // Calculate grid bounds in grid coordinates
+            // anchorPoint is typically the center or corner of the grid
+            // gridSize defines the size in world units, but we need to convert to grid cells
+            // For simplicity, assuming anchorPoint is the minimum corner and gridSize is in grid cells
+            Vector3Int minBound = new Vector3Int(
+                Mathf.RoundToInt(anchorPointValue.x),
+                Mathf.RoundToInt(anchorPointValue.y),
+                Mathf.RoundToInt(anchorPointValue.z));
+            Vector3Int maxBound = minBound + new Vector3Int(
+                Mathf.RoundToInt(gridSizeValue.x),
+                Mathf.RoundToInt(gridSizeValue.y),
+                Mathf.RoundToInt(gridSizeValue.z));
+
+            // Check if all positions are within bounds
+            foreach (var pos in positionToOccupy)
+            {
+                if (pos.x < minBound.x || pos.x >= maxBound.x ||
+                    pos.y < minBound.y || pos.y >= maxBound.y ||
+                    pos.z < minBound.z || pos.z >= maxBound.z)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public IEnumerable<Vector3Int> GetPositionsForObject(Vector3Int gridPosition, Vector3Int objectSize)
+        {
+            return CalculatePositions(gridPosition, objectSize);
+        }
+
+        public bool HasObjectAt(Vector3Int gridPosition)
+        {
+            return placedObjects.ContainsKey(gridPosition);
+        }
+
+        public bool HasObjectAtXZ(Vector3Int gridPosition)
+        {
+            foreach (var pos in placedObjects.Keys)
+            {
+                if (pos.x == gridPosition.x && pos.z == gridPosition.z)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         internal int GetRepresentationIndex(Vector3Int gridPosition)

@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.ObjectsDatabaseSO
   objectsData:
   - <Name>k__BackingField: Cube
-    <ID>k__BackingField: 0
+    <ID>k__BackingField: 1
     <Size>k__BackingField: {x: 1, y: 1, z: 2}
     <Prefab>k__BackingField: {fileID: 5716416251303328713, guid: a611064640f82184a9834e292cae1915, type: 3}
