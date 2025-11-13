@@ -13,8 +13,7 @@ namespace GridBuilder.Core
         Grid grid;
         PreviewSystem previewSystem;
         ObjectsDatabaseSO database;
-        GridData floorData;
-        GridData furnitureData;
+        GridData gridData;
         ObjectPlacer objectPlacer;
         SoundFeedback soundFeedback;
         private struct PlacementGeometry
@@ -28,8 +27,7 @@ namespace GridBuilder.Core
                             Grid grid,
                             PreviewSystem previewSystem,
                             ObjectsDatabaseSO database,
-                            GridData floorData,
-                            GridData furnitureData,
+                            GridData gridData,
                             ObjectPlacer objectPlacer,
                             SoundFeedback soundFeedback)
         {
@@ -37,8 +35,7 @@ namespace GridBuilder.Core
             this.grid = grid;
             this.previewSystem = previewSystem;
             this.database = database;
-            this.floorData = floorData;
-            this.furnitureData = furnitureData;
+            this.gridData = gridData;
             this.objectPlacer = objectPlacer;
             this.soundFeedback = soundFeedback;
 
@@ -91,10 +88,7 @@ namespace GridBuilder.Core
             int index = objectPlacer.PlaceObject(database.objectsData[selectedObjectIndex].Prefab,
                 placementPosition);
 
-            GridData selectedData = database.objectsData[selectedObjectIndex].ID == 0 ?
-                floorData :
-                furnitureData;
-            selectedData.AddObjectAt(geometry.Origin,
+            gridData.AddObjectAt(geometry.Origin,
                 database.objectsData[selectedObjectIndex].Size,
                 database.objectsData[selectedObjectIndex].ID,
                 index);
@@ -109,7 +103,7 @@ namespace GridBuilder.Core
             Vector3Int objectSize = database.objectsData[selectedObjectIndex].Size;
             geometry = CalculatePlacementGeometry(gridPosition, objectSize);
             // TODO: Check if within grid 
-            return floorData.CanPlaceObejctAt(geometry.Origin, objectSize) && furnitureData.CanPlaceObejctAt(geometry.Origin, objectSize);
+            return gridData.CanPlaceObejctAt(geometry.Origin, objectSize);
         }
 
         public void UpdateState(Vector3Int gridPosition)

@@ -18,7 +18,7 @@ namespace GridBuilder.Core
         [SerializeField] AudioClip correctPlacementClip, wrongPlacementClip;
         [SerializeField] AudioSource source;
 
-        GridData floorData, furnitureData;
+        GridData gridData;
 
         [SerializeField] PreviewSystem preview;
 
@@ -40,8 +40,7 @@ namespace GridBuilder.Core
 
         void Awake()
         {
-            floorData = new();
-            furnitureData = new();
+            gridData = new();
 
             // Calculate grid bounds automatically from gridVisualization and grid cell size
             // Note: gridVisualization needs to be active to get accurate bounds
@@ -89,8 +88,7 @@ namespace GridBuilder.Core
                                             grid,
                                             preview,
                                             database,
-                                            floorData,
-                                            furnitureData,
+                                            gridData,
                                             objectPlacer,
                                             soundFeedback);
             OnClicked += PlaceStructure;
@@ -103,8 +101,7 @@ namespace GridBuilder.Core
             gridVisualization.SetActive(true);
             buildingState = new RemovingState(grid,
                                             preview,
-                                            floorData,
-                                            furnitureData,
+                                            gridData,
                                             objectPlacer,
                                             soundFeedback);
             OnClicked += PlaceStructure;

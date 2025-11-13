@@ -10,22 +10,19 @@ namespace GridBuilder.Core
         private int gameObjectIndex = -1;
         Grid grid;
         PreviewSystem previewSystem;
-        GridData floorData;
-        GridData furnitureData;
+        GridData gridData;
         ObjectPlacer objectPlacer;
         SoundFeedback soundFeedback;
 
         public RemovingState(Grid grid,
                             PreviewSystem previewSystem,
-                            GridData floorData,
-                            GridData furnitureData,
+                            GridData gridData,
                             ObjectPlacer objectPlacer,
                             SoundFeedback soundFeedback)
         {
             this.grid = grid;
             this.previewSystem = previewSystem;
-            this.floorData = floorData;
-            this.furnitureData = furnitureData;
+            this.gridData = gridData;
             this.objectPlacer = objectPlacer;
             this.soundFeedback = soundFeedback;
             previewSystem.StartShowingRemovePreview(grid);
@@ -39,13 +36,9 @@ namespace GridBuilder.Core
         public void OnAction(Vector3Int gridPosition)
         {
             GridData selectedData = null;
-            if (furnitureData.CanPlaceObejctAt(gridPosition, Vector3Int.one) == false)
+            if (!gridData.CanPlaceObejctAt(gridPosition, Vector3Int.one))
             {
-                selectedData = furnitureData;
-            }
-            else if (floorData.CanPlaceObejctAt(gridPosition, Vector3Int.one) == false)
-            {
-                selectedData = floorData;
+                selectedData = gridData;
             }
 
             if (selectedData == null)
@@ -68,8 +61,7 @@ namespace GridBuilder.Core
 
         private bool CheckIfSelectionIsValid(Vector3Int gridPosition)
         {
-            return !(furnitureData.CanPlaceObejctAt(gridPosition, Vector3Int.one) &&
-                floorData.CanPlaceObejctAt(gridPosition, Vector3Int.one));
+            return gridData.CanPlaceObejctAt(gridPosition, Vector3Int.one);
         }
 
         public void UpdateState(Vector3Int gridPosition)
