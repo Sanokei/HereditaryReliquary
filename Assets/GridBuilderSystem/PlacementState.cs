@@ -25,6 +25,8 @@ namespace GridBuilder.Core
 
         private List<SplineGridContainer> splineGridContainers;
         private SplineGridContainer currentContainer;
+        private float currentRotation = 0f;
+        private PreviewSystem previewSystemRef;
 
         public PlacementState(int iD,
                             Grid grid,
@@ -44,6 +46,7 @@ namespace GridBuilder.Core
             this.soundFeedback = soundFeedback;
             this.splineGridContainers = splineGridContainers;
             this.currentContainer = splineGridContainers != null && splineGridContainers.Count > 0 ? splineGridContainers[0] : null;
+            this.previewSystemRef = previewSystem;
 
             selectedObjectIndex = database.objectsData.FindIndex(data => data.ID == ID);
             if (selectedObjectIndex > -1)
@@ -98,8 +101,9 @@ namespace GridBuilder.Core
             // Match preview calculation exactly: previewCenter + pivotOffset
             Vector3 placementPosition = geometry.PreviewCenter + pivotOffset;
             
+            Quaternion rotation = Quaternion.Euler(0, currentRotation, 0);
             int index = objectPlacer.PlaceObject(database.objectsData[selectedObjectIndex].Prefab,
-                placementPosition);
+                placementPosition, rotation);
 
             // Add object to all containers that contain parts of it
             if (splineGridContainers != null && splineGridContainers.Count > 0)
@@ -333,6 +337,20 @@ namespace GridBuilder.Core
                         objectIndex);
                 }
             }
+        }
+        
+        public void SetRotation(float rotation)
+        {
+            currentRotation = rotation;
+            if (previewSystemRef != null)
+            {
+                previewSystemRef.SetRotation(rotation);
+            }
+        }
+        
+        public float GetRotation()
+        {
+            return currentRotation;
         }
         
         private PlacementGeometry CalculatePlacementGeometry(Vector3Int gridPosition, Vector3Int objectSize)

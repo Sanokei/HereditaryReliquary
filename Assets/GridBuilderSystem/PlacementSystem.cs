@@ -50,7 +50,10 @@ namespace GridBuilder.Core
         {
             // debug
             StartPlacement(databases[0],0);
+            lastMouseScreenPosition = Input.mousePosition;
         }
+        
+        private Vector3 lastMouseScreenPosition;
         
         void Update()
         {
@@ -58,6 +61,33 @@ namespace GridBuilder.Core
                 return;
                 
             if (activeGridContainers == null || activeGridContainers.Count == 0)
+                return;
+            
+            // Only check for input events - position updates handled separately
+            if (Input.GetMouseButtonDown(0) && !IsPointerOverUI())
+                OnClicked?.Invoke();
+            
+            if (Input.GetKeyDown(KeyCode.Escape))
+                OnExit?.Invoke();
+            
+            // Handle rotation with R key
+            if (Input.GetKeyDown(KeyCode.R) && buildingState is PlacementState placementState)
+            {
+                RotateObject(placementState);
+            }
+            
+            // Check if mouse moved (only update when mouse actually moves)
+            Vector3 currentMousePos = Input.mousePosition;
+            if (Vector3.Distance(currentMousePos, lastMouseScreenPosition) > 0.1f)
+            {
+                lastMouseScreenPosition = currentMousePos;
+                UpdateMousePosition();
+            }
+        }
+        
+        private void UpdateMousePosition()
+        {
+            if (buildingState == null || activeGridContainers == null || activeGridContainers.Count == 0)
                 return;
                 
             Vector3 mousePosition = GetSelectedMapPosition();
@@ -81,10 +111,27 @@ namespace GridBuilder.Core
                 }
                 lastDetectedPosition = gridPosition;
             }
-            if (Input.GetMouseButtonDown(0))
-                OnClicked?.Invoke();
-            if (Input.GetKeyDown(KeyCode.Escape))
-                OnExit?.Invoke();
+        }
+        
+        private void RotateObject(PlacementState placementState)
+        {
+            // Rotate 90 degrees on Y-axis
+            float currentRotation = preview.GetRotation();
+            float newRotation = (currentRotation + 90f) % 360f;
+            preview.SetRotation(newRotation);
+            placementState.SetRotation(newRotation);
+            
+            // Update preview position to reflect rotation
+            if (activeGridContainers != null && activeGridContainers.Count > 0)
+            {
+                Vector3 mousePosition = GetSelectedMapPosition();
+                SplineGridContainer currentContainer = GetContainerAtPosition(mousePosition);
+                if (currentContainer != null && currentContainer.Grid != null)
+                {
+                    Vector3Int gridPosition = currentContainer.Grid.WorldToCell(mousePosition);
+                    placementState.UpdateState(gridPosition, currentContainer);
+                }
+            }
         }
         
         /// <summary>

@@ -18,6 +18,7 @@ namespace GridBuilder.Core
         private Renderer cellIndicatorRenderer;
         private Vector3Int currentObjectSize = Vector3Int.one;
         private Grid grid;
+        private float currentRotation = 0f;
 
         private void Awake()
         {
@@ -30,10 +31,45 @@ namespace GridBuilder.Core
         {
             this.grid = grid;
             currentObjectSize = size;
+            currentRotation = 0f;
             previewObject = Instantiate(prefab);
             PreparePreview(previewObject);
             PrepareCursor(size);
+            
+            // Reset rotation for both preview and cell indicator
+            Quaternion identityRotation = Quaternion.identity;
+            if (previewObject != null)
+            {
+                previewObject.transform.rotation = identityRotation;
+            }
+            if (cellIndicator != null)
+            {
+                cellIndicator.transform.rotation = identityRotation;
+            }
+            
             cellIndicator.SetActive(true);
+        }
+        
+        public void SetRotation(float yRotation)
+        {
+            currentRotation = yRotation;
+            Quaternion rotation = Quaternion.Euler(0, currentRotation, 0);
+            
+            if (previewObject != null)
+            {
+                previewObject.transform.rotation = rotation;
+            }
+            
+            // Also rotate the cell indicator
+            if (cellIndicator != null)
+            {
+                cellIndicator.transform.rotation = rotation;
+            }
+        }
+        
+        public float GetRotation()
+        {
+            return currentRotation;
         }
 
         private void PrepareCursor(Vector3Int size)
@@ -103,9 +139,10 @@ namespace GridBuilder.Core
             // Position cell indicator at the same position as preview
             // The position passed in already includes offset for centering multi-cell objects
             // Cell indicator has center pivot, so it aligns correctly when positioned at the center
+            // Use a higher Y offset to prevent z-fighting with the grid visualization mesh
             cellIndicator.transform.position = new Vector3(
                 position.x,
-                0.01f,
+                0.02f, // Increased from 0.01f to sit above grid mesh without obvious gap
                 position.z);
         }
 
