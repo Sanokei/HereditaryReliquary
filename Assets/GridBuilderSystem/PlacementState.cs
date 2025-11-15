@@ -101,10 +101,19 @@ namespace GridBuilder.Core
             int index = objectPlacer.PlaceObject(database.objectsData[selectedObjectIndex].Prefab,
                 placementPosition);
 
-            gridData.AddObjectAt(geometry.Origin,
-                database.objectsData[selectedObjectIndex].Size,
-                database.objectsData[selectedObjectIndex].ID,
-                index);
+            // Add object to all containers that contain parts of it
+            if (splineGridContainers != null && splineGridContainers.Count > 0)
+            {
+                AddObjectToRelevantContainers(geometry.Origin, objectSize, index);
+            }
+            else
+            {
+                // Fallback to single container
+                gridData.AddObjectAt(geometry.Origin,
+                    database.objectsData[selectedObjectIndex].Size,
+                    database.objectsData[selectedObjectIndex].ID,
+                    index);
+            }
 
             // Update preview position using the same calculation as UpdateState
             // This ensures the preview is correctly positioned immediately after placement
@@ -116,6 +125,12 @@ namespace GridBuilder.Core
             Vector3Int objectSize = database.objectsData[selectedObjectIndex].Size;
             geometry = CalculatePlacementGeometry(gridPosition, objectSize);
             
+            // Check across all active containers if available
+            if (splineGridContainers != null && splineGridContainers.Count > 0)
+            {
+                return CanPlaceObjectAcrossContainers(geometry.Origin, objectSize);
+            }
+            
             // Check if within spline boundary if current container is available
             if (currentContainer != null)
             {
@@ -124,6 +139,77 @@ namespace GridBuilder.Core
             
             // Fallback to grid data check only
             return gridData.CanPlaceObejctAt(geometry.Origin, objectSize);
+        }
+        
+        /// <summary>
+        /// Checks if an object can be placed across multiple containers.
+        /// Each cell must be within at least one container, and no collisions across all containers.
+        /// </summary>
+        private bool CanPlaceObjectAcrossContainers(Vector3Int gridPosition, Vector3Int objectSize)
+        {
+            if (splineGridContainers == null || splineGridContainers.Count == 0)
+                return false;
+            
+            // Use the first container's grid for coordinate calculations
+            Grid referenceGrid = splineGridContainers[0].Grid;
+            if (referenceGrid == null)
+                return false;
+            
+            // Track which containers contain each cell and check for collisions
+            Dictionary<Vector3Int, List<SplineGridContainer>> cellContainers = new Dictionary<Vector3Int, List<SplineGridContainer>>();
+            
+            // Check all cells the object would occupy
+            for (int x = 0; x < objectSize.x; x++)
+            {
+                for (int y = 0; y < objectSize.y; y++)
+                {
+                    for (int z = 0; z < objectSize.z; z++)
+                    {
+                        Vector3Int cellPos = gridPosition + new Vector3Int(x, y, z);
+                        Vector3 worldPos = referenceGrid.GetCellCenterWorld(cellPos);
+                        
+                        // Find which containers contain this cell
+                        List<SplineGridContainer> containingContainers = new List<SplineGridContainer>();
+                        foreach (var container in splineGridContainers)
+                        {
+                            if (container != null && container.IsPositionWithinBoundary(worldPos))
+                            {
+                                containingContainers.Add(container);
+                            }
+                        }
+                        
+                        // If no container contains this cell, placement is invalid
+                        if (containingContainers.Count == 0)
+                        {
+                            return false;
+                        }
+                        
+                        cellContainers[cellPos] = containingContainers;
+                    }
+                }
+            }
+            
+            // Check for collisions across all relevant containers
+            // We need to check each cell against all containers that contain it
+            foreach (var kvp in cellContainers)
+            {
+                Vector3Int cellPos = kvp.Key;
+                Vector3 worldPos = referenceGrid.GetCellCenterWorld(cellPos);
+                List<SplineGridContainer> containers = kvp.Value;
+                
+                // Check if any of the containers that contain this cell already have an object here
+                foreach (var container in containers)
+                {
+                    // Convert to container's grid space
+                    Vector3Int containerCellPos = container.Grid.WorldToCell(worldPos);
+                    if (container.GridData.HasObjectAt(containerCellPos))
+                    {
+                        return false;
+                    }
+                }
+            }
+            
+            return true;
         }
 
         // Interface-compliant overload
@@ -161,6 +247,94 @@ namespace GridBuilder.Core
             OnAction(gridPosition, currentContainer);
         }
 
+        /// <summary>
+        /// Adds an object to all containers that contain parts of it
+        /// </summary>
+        private void AddObjectToRelevantContainers(Vector3Int gridPosition, Vector3Int objectSize, int objectIndex)
+        {
+            if (splineGridContainers == null || splineGridContainers.Count == 0)
+                return;
+            
+            Grid referenceGrid = splineGridContainers[0].Grid;
+            if (referenceGrid == null)
+                return;
+            
+            // Track which containers need to have which cells added
+            Dictionary<SplineGridContainer, List<Vector3Int>> containerCells = new Dictionary<SplineGridContainer, List<Vector3Int>>();
+            
+            // Determine which cells belong to which containers
+            for (int x = 0; x < objectSize.x; x++)
+            {
+                for (int y = 0; y < objectSize.y; y++)
+                {
+                    for (int z = 0; z < objectSize.z; z++)
+                    {
+                        Vector3Int cellPos = gridPosition + new Vector3Int(x, y, z);
+                        Vector3 worldPos = referenceGrid.GetCellCenterWorld(cellPos);
+                        
+                        // Find which containers contain this cell
+                        foreach (var container in splineGridContainers)
+                        {
+                            if (container != null && container.IsPositionWithinBoundary(worldPos))
+                            {
+                                if (!containerCells.ContainsKey(container))
+                                {
+                                    containerCells[container] = new List<Vector3Int>();
+                                }
+                                containerCells[container].Add(cellPos);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Add the object to each relevant container's grid data
+            foreach (var kvp in containerCells)
+            {
+                SplineGridContainer container = kvp.Key;
+                List<Vector3Int> cells = kvp.Value;
+                
+                // For each container, we need to add the object at the minimum cell position
+                // that's within that container's grid space
+                if (cells.Count > 0)
+                {
+                    // Find the minimum cell position for this container
+                    Vector3Int minCell = cells[0];
+                    foreach (var cell in cells)
+                    {
+                        if (cell.x < minCell.x || (cell.x == minCell.x && cell.z < minCell.z) || 
+                            (cell.x == minCell.x && cell.z == minCell.z && cell.y < minCell.y))
+                        {
+                            minCell = cell;
+                        }
+                    }
+                    
+                    // Calculate the size relative to this container's grid
+                    // We need to find the bounding box of cells in this container
+                    Vector3Int maxCell = cells[0];
+                    foreach (var cell in cells)
+                    {
+                        if (cell.x > maxCell.x || (cell.x == maxCell.x && cell.z > maxCell.z) || 
+                            (cell.x == maxCell.x && cell.z == maxCell.z && cell.y > maxCell.y))
+                        {
+                            maxCell = cell;
+                        }
+                    }
+                    
+                    Vector3Int containerObjectSize = maxCell - minCell + Vector3Int.one;
+                    
+                    // Convert world cell position to container's grid space
+                    Vector3 worldMinPos = referenceGrid.GetCellCenterWorld(minCell);
+                    Vector3Int containerGridPos = container.Grid.WorldToCell(worldMinPos);
+                    
+                    container.GridData.AddObjectAt(containerGridPos,
+                        containerObjectSize,
+                        database.objectsData[selectedObjectIndex].ID,
+                        objectIndex);
+                }
+            }
+        }
+        
         private PlacementGeometry CalculatePlacementGeometry(Vector3Int gridPosition, Vector3Int objectSize)
         {
             Vector3 cellSize = grid.cellSize;
