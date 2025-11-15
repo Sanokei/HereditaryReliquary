@@ -725,7 +725,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 34dceebc85e30b6428a359bd3a07095b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.PreviewSystem
-  previewYOffset: 0.06
+  previewYOffset: 0
   cellIndicator: {fileID: 6442480874794939870}
   previewMaterialPrefab: {fileID: 2100000, guid: 3e04babce0067c14d97641d7834790f1, type: 2}
 --- !u!4 &1307109930
@@ -928,7 +928,7 @@ Transform:
   m_GameObject: {fileID: 1448516281}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 10.56}
+  m_LocalPosition: {x: 5, y: 0, z: 15}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1340,21 +1340,25 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
---- !u!4 &4986613607887892910
-Transform:
+--- !u!224 &4986613607887892910
+RectTransform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6442480874794939870}
-  serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: -0.49, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!23 &5418409585124789929
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1441,7 +1445,6 @@ SceneRoots:
   - {fileID: 285413504}
   - {fileID: 1307109930}
   - {fileID: 664690142}
-  - {fileID: 4986613607887892910}
   - {fileID: 1853800616}
   - {fileID: 330585546}
   - {fileID: 410087041}
@@ -1449,3 +1452,4 @@ SceneRoots:
   - {fileID: 347437155}
   - {fileID: 1511650090}
   - {fileID: 1448516284}
+  - {fileID: 4986613607887892910}

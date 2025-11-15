@@ -44,7 +44,7 @@ namespace GridBuilder.Core
             }
             if (cellIndicator != null)
             {
-                cellIndicator.transform.rotation = identityRotation;
+                cellIndicator.transform.localScale = new Vector3(size.x, size.z, 1);
             }
             
             cellIndicator.SetActive(true);
@@ -63,7 +63,7 @@ namespace GridBuilder.Core
             // Also rotate the cell indicator
             if (cellIndicator != null)
             {
-                cellIndicator.transform.rotation = rotation;
+                // TODO
             }
         }
         
