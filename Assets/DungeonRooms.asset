@@ -12,8 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 70cc31a7b8c0524489921bb7837d4e27, type: 3}
   m_Name: DungeonRooms
   m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.ObjectsDatabaseSO
+  placementLayermask:
+    serializedVersion: 2
+    m_Bits: 64
   objectsData:
   - <Name>k__BackingField: Cube
-    <ID>k__BackingField: 1
+    <ID>k__BackingField: 0
     <Size>k__BackingField: {x: 1, y: 1, z: 2}
     <Prefab>k__BackingField: {fileID: 5716416251303328713, guid: a611064640f82184a9834e292cae1915, type: 3}

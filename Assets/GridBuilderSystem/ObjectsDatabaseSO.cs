@@ -8,6 +8,7 @@ namespace GridBuilder.Core
     [CreateAssetMenu]
     public class ObjectsDatabaseSO : ScriptableObject
     {
+        public LayerMask placementLayermask;
         public List<ObjectData> objectsData;
     }
 

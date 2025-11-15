@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -9,16 +10,12 @@ namespace GridBuilder.Core
 {
     public class PlacementSystem : MonoBehaviour
     {
-        [SerializeField] Grid grid;
-
-        [SerializeField] ObjectsDatabaseSO database;
-
-        [SerializeField] GameObject gridVisualization;
+        [SerializeField] List<SplineGridContainer> splineGridContainers = new List<SplineGridContainer>();
+        
+        [SerializeField] List<ObjectsDatabaseSO> databases = new List<ObjectsDatabaseSO>();
 
         [SerializeField] AudioClip correctPlacementClip, wrongPlacementClip;
         [SerializeField] AudioSource source;
-
-        GridData gridData;
 
         [SerializeField] PreviewSystem preview;
 
@@ -34,41 +31,37 @@ namespace GridBuilder.Core
 
         Vector3 lastPosition;
 
-        [SerializeField] LayerMask placementLayermask;
+        private SplineGridContainer activeGridContainer;
+        private ObjectsDatabaseSO activeDatabase;
 
         public event Action OnClicked, OnExit;
 
         void Awake()
         {
-            gridData = new();
-
-            // Calculate grid bounds automatically from gridVisualization and grid cell size
-            // Note: gridVisualization needs to be active to get accurate bounds
-            bool wasActive = gridVisualization != null ? gridVisualization.activeSelf : false;
-            if (gridVisualization != null && !wasActive)
+            // Hide all grids initially
+            foreach (var container in splineGridContainers)
             {
-                gridVisualization.SetActive(true);
-            }
-
-            // Set gridVisualization back to inactive if it wasn't active before
-            if (gridVisualization != null && !wasActive)
-            {
-                gridVisualization.SetActive(false);
+                if (container != null)
+                    container.HideGrid();
             }
         }
 
         void Start()
         {
             // debug
-            StartPlacement(1);
+            StartPlacement(databases[0],0);
         }
         
         void Update()
         {
             if (buildingState == null)
                 return;
+                
+            if (activeGridContainer == null || activeGridContainer.Grid == null)
+                return;
+                
             Vector3 mousePosition = GetSelectedMapPosition();
-            Vector3Int gridPosition = grid.WorldToCell(mousePosition);
+            Vector3Int gridPosition = activeGridContainer.Grid.WorldToCell(mousePosition);
             if (lastDetectedPosition != gridPosition)
             {
                 buildingState.UpdateState(gridPosition);
@@ -80,17 +73,55 @@ namespace GridBuilder.Core
                 OnExit?.Invoke();
         }
 
-        public void StartPlacement(int ID)
+        public void StartPlacement(ObjectsDatabaseSO targetDatabase, int ID)
         {
             StopPlacement();
-            gridVisualization.SetActive(true);
+
+            activeDatabase = targetDatabase;
+            
+            // Find spline grid container that matches the database's layer mask
+            SplineGridContainer targetContainer = null;
+            foreach (var container in splineGridContainers)
+            {
+                if (container != null && container.ObjectsDatabase == targetDatabase)
+                {
+                    // Check if layer masks match
+                    if ((container.PlacementLayerMask.value & targetDatabase.placementLayermask.value) != 0)
+                    {
+                        targetContainer = container;
+                        break;
+                    }
+                }
+            }
+            
+            if (targetContainer == null)
+            {
+                Debug.LogError($"No spline grid container found for database with layer mask \"{LayerMask.LayerToName(targetDatabase.placementLayermask.value)}\".\n Does the database have a layer mask set?");
+                return;
+            }
+            
+            activeGridContainer = targetContainer;
+            
+            // Show the active grid, hide others
+            foreach (var container in splineGridContainers)
+            {
+                if (container != null)
+                {
+                    if (container == activeGridContainer)
+                        container.ShowGrid();
+                    else
+                        container.HideGrid();
+                }
+            }
+            
             buildingState = new PlacementState(ID,
-                                            grid,
+                                            activeGridContainer.Grid,
                                             preview,
-                                            database,
-                                            gridData,
+                                            activeDatabase,
+                                            activeGridContainer.GridData,
                                             objectPlacer,
-                                            soundFeedback);
+                                            soundFeedback,
+                                            activeGridContainer);
             OnClicked += PlaceStructure;
             OnExit += StopPlacement;
         }
@@ -98,12 +129,30 @@ namespace GridBuilder.Core
         public void StartRemoving()
         {
             StopPlacement();
-            gridVisualization.SetActive(true);
-            buildingState = new RemovingState(grid,
-                                            preview,
-                                            gridData,
-                                            objectPlacer,
-                                            soundFeedback);
+            
+            // Show all grids for removal
+            foreach (var container in splineGridContainers)
+            {
+                if (container != null)
+                    container.ShowGrid();
+            }
+            
+            // Use first available grid for removal state
+            if (splineGridContainers.Count > 0 && splineGridContainers[0] != null)
+            {
+                activeGridContainer = splineGridContainers[0];
+                buildingState = new RemovingState(activeGridContainer.Grid,
+                                                preview,
+                                                activeGridContainer.GridData,
+                                                objectPlacer,
+                                                soundFeedback);
+            }
+            else
+            {
+                Debug.LogError("No spline grid containers available for removal");
+                return;
+            }
+            
             OnClicked += PlaceStructure;
             OnExit += StopPlacement;
         }
@@ -114,33 +163,36 @@ namespace GridBuilder.Core
             {
                 return;
             }
+            
+            if (activeGridContainer == null || activeGridContainer.Grid == null)
+                return;
+                
             Vector3 mousePosition = GetSelectedMapPosition();
-            Vector3Int gridPosition = grid.WorldToCell(mousePosition);
+            Vector3Int gridPosition = activeGridContainer.Grid.WorldToCell(mousePosition);
 
             buildingState.OnAction(gridPosition);
-
         }
-
-        //bool CheckPlacementValidity(Vector3Int gridPosition, int selectedObjectIndex)
-        //{
-        //    GridData selectedData = database.objectsData[selectedObjectIndex].ID == 0 ? 
-        //        floorData : 
-        //        furnitureData;
-
-        //    return selectedData.CanPlaceObejctAt(gridPosition, database.objectsData[selectedObjectIndex].Size);
-        //}
 
         void StopPlacement()
         {
             soundFeedback.PlaySound(SoundType.Click);
             if (buildingState == null)
                 return;
-            gridVisualization.SetActive(false);
+                
+            // Hide all grids
+            foreach (var container in splineGridContainers)
+            {
+                if (container != null)
+                    container.HideGrid();
+            }
+            
             buildingState.EndState();
             OnClicked -= PlaceStructure;
             OnExit -= StopPlacement;
             lastDetectedPosition = Vector3Int.zero;
             buildingState = null;
+            activeGridContainer = null;
+            activeDatabase = null;
         }
 
         public Vector3 GetSelectedMapPosition()
@@ -149,7 +201,11 @@ namespace GridBuilder.Core
             mousePos.z = sceneCamera.nearClipPlane;
             Ray ray = sceneCamera.ScreenPointToRay(mousePos);
             RaycastHit hit;
-            if (Physics.Raycast(ray, out hit, Mathf.Infinity, placementLayermask))
+            
+            // Use active grid container's layer mask if available
+            LayerMask layerMask = activeGridContainer != null ? activeGridContainer.PlacementLayerMask : ~0;
+            
+            if (Physics.Raycast(ray, out hit, Mathf.Infinity, layerMask))
             {
                 lastPosition = hit.point;
             }

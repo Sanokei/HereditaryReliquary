@@ -23,13 +23,16 @@ namespace GridBuilder.Core
             public Vector3 PreviewCenter;
         }
 
+        private SplineGridContainer splineGridContainer;
+
         public PlacementState(int iD,
                             Grid grid,
                             PreviewSystem previewSystem,
                             ObjectsDatabaseSO database,
                             GridData gridData,
                             ObjectPlacer objectPlacer,
-                            SoundFeedback soundFeedback)
+                            SoundFeedback soundFeedback,
+                            SplineGridContainer splineGridContainer = null)
         {
             ID = iD;
             this.grid = grid;
@@ -38,6 +41,7 @@ namespace GridBuilder.Core
             this.gridData = gridData;
             this.objectPlacer = objectPlacer;
             this.soundFeedback = soundFeedback;
+            this.splineGridContainer = splineGridContainer;
 
             selectedObjectIndex = database.objectsData.FindIndex(data => data.ID == ID);
             if (selectedObjectIndex > -1)
@@ -102,7 +106,14 @@ namespace GridBuilder.Core
         {
             Vector3Int objectSize = database.objectsData[selectedObjectIndex].Size;
             geometry = CalculatePlacementGeometry(gridPosition, objectSize);
-            // TODO: Check if within grid 
+            
+            // Check if within spline boundary if spline container is available
+            if (splineGridContainer != null)
+            {
+                return splineGridContainer.CanPlaceObjectAt(geometry.Origin, objectSize);
+            }
+            
+            // Fallback to grid data check only
             return gridData.CanPlaceObejctAt(geometry.Origin, objectSize);
         }
 
