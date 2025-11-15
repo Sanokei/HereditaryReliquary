@@ -23,7 +23,8 @@ namespace GridBuilder.Core
             public Vector3 PreviewCenter;
         }
 
-        private SplineGridContainer splineGridContainer;
+        private List<SplineGridContainer> splineGridContainers;
+        private SplineGridContainer currentContainer;
 
         public PlacementState(int iD,
                             Grid grid,
@@ -32,7 +33,7 @@ namespace GridBuilder.Core
                             GridData gridData,
                             ObjectPlacer objectPlacer,
                             SoundFeedback soundFeedback,
-                            SplineGridContainer splineGridContainer = null)
+                            List<SplineGridContainer> splineGridContainers = null)
         {
             ID = iD;
             this.grid = grid;
@@ -41,7 +42,8 @@ namespace GridBuilder.Core
             this.gridData = gridData;
             this.objectPlacer = objectPlacer;
             this.soundFeedback = soundFeedback;
-            this.splineGridContainer = splineGridContainer;
+            this.splineGridContainers = splineGridContainers;
+            this.currentContainer = splineGridContainers != null && splineGridContainers.Count > 0 ? splineGridContainers[0] : null;
 
             selectedObjectIndex = database.objectsData.FindIndex(data => data.ID == ID);
             if (selectedObjectIndex > -1)
@@ -61,8 +63,15 @@ namespace GridBuilder.Core
             previewSystem.StopShowingPreview();
         }
 
-        public void OnAction(Vector3Int gridPosition)
+        public void OnAction(Vector3Int gridPosition, SplineGridContainer container)
         {
+            // Update current container
+            currentContainer = container;
+            if (currentContainer != null)
+            {
+                grid = currentContainer.Grid;
+                gridData = currentContainer.GridData;
+            }
 
             PlacementGeometry geometry;
             bool placementValidity = CheckPlacementValidity(gridPosition, selectedObjectIndex, out geometry);
@@ -99,7 +108,7 @@ namespace GridBuilder.Core
 
             // Update preview position using the same calculation as UpdateState
             // This ensures the preview is correctly positioned immediately after placement
-            UpdateState(gridPosition);
+            UpdateState(gridPosition, container);
         }
 
         private bool CheckPlacementValidity(Vector3Int gridPosition, int selectedObjectIndex, out PlacementGeometry geometry)
@@ -107,18 +116,34 @@ namespace GridBuilder.Core
             Vector3Int objectSize = database.objectsData[selectedObjectIndex].Size;
             geometry = CalculatePlacementGeometry(gridPosition, objectSize);
             
-            // Check if within spline boundary if spline container is available
-            if (splineGridContainer != null)
+            // Check if within spline boundary if current container is available
+            if (currentContainer != null)
             {
-                return splineGridContainer.CanPlaceObjectAt(geometry.Origin, objectSize);
+                return currentContainer.CanPlaceObjectAt(geometry.Origin, objectSize);
             }
             
             // Fallback to grid data check only
             return gridData.CanPlaceObejctAt(geometry.Origin, objectSize);
         }
 
+        // Interface-compliant overload
         public void UpdateState(Vector3Int gridPosition)
         {
+            // Use current container if available
+            UpdateState(gridPosition, currentContainer);
+        }
+        
+        // Extended overload with container
+        public void UpdateState(Vector3Int gridPosition, SplineGridContainer container)
+        {
+            // Update current container
+            currentContainer = container;
+            if (currentContainer != null)
+            {
+                grid = currentContainer.Grid;
+                gridData = currentContainer.GridData;
+            }
+            
             PlacementGeometry geometry;
             bool placementValidity = CheckPlacementValidity(gridPosition, selectedObjectIndex, out geometry);
 
@@ -127,6 +152,13 @@ namespace GridBuilder.Core
             Vector3 previewPosition = geometry.PreviewCenter;
             
             previewSystem.UpdatePosition(previewPosition, placementValidity);
+        }
+        
+        // Interface-compliant overload
+        public void OnAction(Vector3Int gridPosition)
+        {
+            // Use current container if available
+            OnAction(gridPosition, currentContainer);
         }
 
         private PlacementGeometry CalculatePlacementGeometry(Vector3Int gridPosition, Vector3Int objectSize)
