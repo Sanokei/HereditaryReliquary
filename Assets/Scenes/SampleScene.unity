@@ -128,9 +128,14 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 88705473}
+  - component: {fileID: 88705479}
+  - component: {fileID: 88705478}
+  - component: {fileID: 88705477}
+  - component: {fileID: 88705476}
+  - component: {fileID: 88705475}
   - component: {fileID: 88705474}
   m_Layer: 0
-  m_Name: Grid PlacementSystem
+  m_Name: Grid Building System
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -160,18 +165,95 @@ MonoBehaviour:
   m_GameObject: {fileID: 88705472}
   m_Enabled: 1
   m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 05d8d0ba38071ce48a092683e5308582, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.RemovalSystem
+  wrongPlacementClip: {fileID: 0}
+--- !u!114 &88705475
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 88705472}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a395c162ace226f42be3cfee5433e025, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.PlacementSystem
-  databases:
-  - {fileID: 11400000, guid: 506480ae606a30f46b32decc9c00ae95, type: 2}
   correctPlacementClip: {fileID: 0}
-  wrongPlacementClip: {fileID: 0}
-  source: {fileID: 0}
-  preview: {fileID: 1307109929}
-  objectPlacer: {fileID: 285413505}
-  soundFeedback: {fileID: 664690141}
+--- !u!114 &88705476
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 88705472}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 864ab7faecdb45e49b35876c491f1636, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.SoundFeedback
+  clickSound: {fileID: 0}
+  placeSound: {fileID: 0}
+  removeSound: {fileID: 0}
+  wrongPlacementSound: {fileID: 0}
+  audioSource: {fileID: 0}
+--- !u!114 &88705477
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 88705472}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3d4896efc1ca97d4eb1ca03942925373, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.ObjectPlacer
+  placedGameObjects: []
+--- !u!114 &88705478
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 88705472}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 34dceebc85e30b6428a359bd3a07095b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.PreviewSystem
+  previewYOffset: 0
+  previewOpacity: 0.2
+  cellIndicatorOpacity: 0.8
+  previewColor: {r: 1, g: 1, b: 1, a: 1}
+  invalidPreviewColor: {r: 1, g: 0.18564281, b: 0, a: 1}
+  validCellIndicatorColor: {r: 0, g: 1, b: 0, a: 1}
+  invalidCellIndicatorColor: {r: 1, g: 0.18422438, b: 0, a: 1}
+--- !u!114 &88705479
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 88705472}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4440a7025812a24e9394731545b189a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.BuildingSystemManager
+  previewSystem: {fileID: 88705478}
+  objectPlacer: {fileID: 88705477}
+  soundFeedback: {fileID: 88705476}
   sceneCamera: {fileID: 330585545}
+  Databases:
+  - {fileID: 11400000, guid: 506480ae606a30f46b32decc9c00ae95, type: 2}
+  systems:
+    ItemKeys: 0000000001000000
+    ItemValues:
+    - {fileID: 88705475}
+    - {fileID: 88705474}
 --- !u!1 &181134265
 GameObject:
   m_ObjectHideFlags: 0
@@ -203,51 +285,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1448516284}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &285413503
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 285413504}
-  - component: {fileID: 285413505}
-  m_Layer: 0
-  m_Name: Grid ObjectPlacer
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &285413504
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 285413503}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &285413505
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 285413503}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3d4896efc1ca97d4eb1ca03942925373, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.ObjectPlacer
-  placedGameObjects: []
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
@@ -626,55 +663,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &664690140
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 664690142}
-  - component: {fileID: 664690141}
-  m_Layer: 0
-  m_Name: Grid SoundFeedback
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &664690141
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 664690140}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 864ab7faecdb45e49b35876c491f1636, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.SoundFeedback
-  clickSound: {fileID: 0}
-  placeSound: {fileID: 0}
-  removeSound: {fileID: 0}
-  wrongPlacementSound: {fileID: 0}
-  audioSource: {fileID: 0}
---- !u!4 &664690142
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 664690140}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -724,7 +712,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1307109928
+--- !u!1 &1049931582
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -732,43 +720,38 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1307109930}
-  - component: {fileID: 1307109929}
+  - component: {fileID: 1049931584}
+  - component: {fileID: 1049931583}
   m_Layer: 0
-  m_Name: Grid PreviewSystem
+  m_Name: Place
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1307109929
+--- !u!114 &1049931583
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1307109928}
+  m_GameObject: {fileID: 1049931582}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 34dceebc85e30b6428a359bd3a07095b, type: 3}
+  m_Script: {fileID: 11500000, guid: 4eb1b75e250a97d4ca042c921d4a1a4f, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.PreviewSystem
-  previewYOffset: 0
-  previewOpacity: 0.2
-  previewColor: {r: 1, g: 1, b: 1, a: 1}
-  invalidPreviewColor: {r: 1, g: 0.18564281, b: 0, a: 1}
-  validCellIndicatorColor: {r: 0, g: 1, b: 0, a: 1}
-  invalidCellIndicatorColor: {r: 1, g: 0.18422438, b: 0, a: 1}
---- !u!4 &1307109930
+  m_EditorClassIdentifier: '::'
+  buildingSystemManager: {fileID: 88705479}
+--- !u!4 &1049931584
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1307109928}
+  m_GameObject: {fileID: 1049931582}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: -0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1544,11 +1527,8 @@ SceneRoots:
   m_Roots:
   - {fileID: 459662205}
   - {fileID: 2021623929}
-  - {fileID: 1651884714}
   - {fileID: 88705473}
-  - {fileID: 1307109930}
-  - {fileID: 285413504}
-  - {fileID: 664690142}
+  - {fileID: 1049931584}
   - {fileID: 1853800616}
   - {fileID: 330585546}
   - {fileID: 410087041}
@@ -1557,3 +1537,4 @@ SceneRoots:
   - {fileID: 1511650090}
   - {fileID: 1629741569}
   - {fileID: 1448516284}
+  - {fileID: 1651884714}

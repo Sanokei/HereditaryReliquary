@@ -7,6 +7,8 @@ namespace GridBuilder.Core
     {
         [SerializeField] private float previewYOffset = 0.00f;
         [SerializeField, Range(0f, 1f)] private float previewOpacity = 0.2f;
+        
+        [SerializeField, Range(0f, 1f)] private float cellIndicatorOpacity = 0.8f;
         [SerializeField] private Color previewColor = new Color(1f, 1f, 1f);
         [SerializeField] private Color invalidPreviewColor = new Color(1f, 0f, 0f);
         [SerializeField] private Color validCellIndicatorColor = new Color(0f, 1f, 0f);
@@ -51,7 +53,7 @@ namespace GridBuilder.Core
             
             // Create a material for the cell indicator
             Material cellMaterial = new Material(Shader.Find("Sprites/Default"));
-            cellMaterial.color = new Color(validCellIndicatorColor.r, validCellIndicatorColor.g, validCellIndicatorColor.b);
+            cellMaterial.color = new Color(validCellIndicatorColor.r, validCellIndicatorColor.g, validCellIndicatorColor.b, cellIndicatorOpacity);
             meshRenderer.material = cellMaterial;
             cellIndicatorRenderer = meshRenderer;
             
@@ -292,7 +294,6 @@ namespace GridBuilder.Core
         private void ApplyFeedbackToPreview(bool validity)
         {
             Color c = validity ? previewColor : invalidPreviewColor;
-
             c.a = previewOpacity;
             previewMaterialInstance.color = c;
         }
@@ -300,6 +301,7 @@ namespace GridBuilder.Core
         private void ApplyFeedbackToCursor(bool validity)
         {
             Color c = validity ? validCellIndicatorColor : invalidCellIndicatorColor;
+            c.a = cellIndicatorOpacity;
             cellIndicatorRenderer.sharedMaterial.color = c;
         }
 

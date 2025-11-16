@@ -8,112 +8,24 @@ using UnityEngine.EventSystems;
 
 namespace GridBuilder.Core
 {
-    public class PlacementSystem : MonoBehaviour
+    public class PlacementSystem : BaseBuildingSystem
     {
-        List<SplineGridContainer> splineGridContainers = new List<SplineGridContainer>();
-        
-        [SerializeField] List<ObjectsDatabaseSO> databases = new List<ObjectsDatabaseSO>();
+        [SerializeField] AudioClip correctPlacementClip;
 
-        [SerializeField] AudioClip correctPlacementClip, wrongPlacementClip;
-        [SerializeField] AudioSource source;
-
-        [SerializeField] PreviewSystem preview;
-
-        Vector3Int lastDetectedPosition = Vector3Int.zero;
-
-        [SerializeField] ObjectPlacer objectPlacer;
-
-        IBuildingState buildingState;
-
-        [SerializeField] SoundFeedback soundFeedback;
-
-        [SerializeField] Camera sceneCamera;
-
-        Vector3 lastPosition;
-
-        private List<SplineGridContainer> activeGridContainers = new List<SplineGridContainer>();
         private ObjectsDatabaseSO activeDatabase;
-
-        public event Action OnClicked, OnExit;
-
-        void Awake()
-        {
-            // Find all SplineGridContainer components
-            splineGridContainers = FindObjectsByType<SplineGridContainer>(FindObjectsSortMode.None).ToList();
-
-            // Hide all grids initially
-            foreach (var container in splineGridContainers)
-            {
-                if (container != null)
-                    container.HideGrid();
-            }
-        }
-
-        void Start()
-        {
-            // debug
-            StartPlacement(databases[0],0);
-            lastMouseScreenPosition = Input.mousePosition;
-        }
         
-        private Vector3 lastMouseScreenPosition;
-        
-        void Update()
+        protected override void HandleSystemSpecificInput()
         {
-            if (buildingState == null)
-                return;
-                
-            if (activeGridContainers == null || activeGridContainers.Count == 0)
-                return;
-            
-            // Only check for input events - position updates handled separately
-            if (Input.GetMouseButtonDown(0) && !IsPointerOverUI())
-                OnClicked?.Invoke();
-            
-            if (Input.GetKeyDown(KeyCode.Escape))
-                OnExit?.Invoke();
-            
             // Handle rotation with R key
-            if (Input.GetKeyDown(KeyCode.R) && buildingState is PlacementState placementState)
+            if (Input.GetKeyDown(KeyCode.R))
             {
-                RotateObject(placementState);
-            }
-            
-            // Check if mouse moved (only update when mouse actually moves)
-            Vector3 currentMousePos = Input.mousePosition;
-            if (Vector3.Distance(currentMousePos, lastMouseScreenPosition) > 0.1f)
-            {
-                lastMouseScreenPosition = currentMousePos;
-                UpdateMousePosition();
+                RotateObject(buildingState as PlacementState);
             }
         }
         
-        private void UpdateMousePosition()
+        protected override void UpdateStateForContainer(Vector3Int gridPosition, SplineGridContainer container)
         {
-            if (buildingState == null || activeGridContainers == null || activeGridContainers.Count == 0)
-                return;
-                
-            Vector3 mousePosition = GetSelectedMapPosition();
-            
-            // Find which active grid container the mouse is over
-            SplineGridContainer currentContainer = GetContainerAtPosition(mousePosition);
-            if (currentContainer == null || currentContainer.Grid == null)
-                return;
-                
-            Vector3Int gridPosition = currentContainer.Grid.WorldToCell(mousePosition);
-            if (lastDetectedPosition != gridPosition)
-            {
-                // If it's a PlacementState, use the extended method with container
-                if (buildingState is PlacementState placementState)
-                {
-                    placementState.UpdateState(gridPosition, currentContainer);
-                }
-                else
-                {
-                    buildingState.UpdateState(gridPosition);
-                }
-                lastDetectedPosition = gridPosition;
-            }
+            (buildingState as PlacementState).UpdateState(gridPosition, container);
         }
         
         private void RotateObject(PlacementState placementState)
@@ -136,22 +48,6 @@ namespace GridBuilder.Core
                 }
             }
         }
-        
-        /// <summary>
-        /// Finds which active grid container contains the given world position
-        /// </summary>
-        private SplineGridContainer GetContainerAtPosition(Vector3 worldPosition)
-        {
-            foreach (var container in activeGridContainers)
-            {
-                if (container != null && container.IsPositionWithinBoundary(worldPosition))
-                {
-                    return container;
-                }
-            }
-            // If no container contains the position, return the first one as fallback
-            return activeGridContainers.Count > 0 ? activeGridContainers[0] : null;
-        }
 
         public void StartPlacement(ObjectsDatabaseSO targetDatabase, int ID)
         {
@@ -160,8 +56,18 @@ namespace GridBuilder.Core
             activeDatabase = targetDatabase;
             activeGridContainers.Clear();
             
+            // Get all spline grid containers from manager
+            if (manager == null)
+            {
+                Debug.LogError("BuildingSystemManager not found. Cannot start placement.");
+                return;
+            }
+            
+            List<SplineGridContainer> allContainers = manager.SplineGridContainers;
+            List<SplineGridContainer> containersToHide = new List<SplineGridContainer>();
+            
             // Find all spline grid containers that match the database's layer mask
-            foreach (var container in splineGridContainers)
+            foreach (var container in allContainers)
             {
                 if (container != null && container.ObjectsDatabase == targetDatabase)
                 {
@@ -170,6 +76,14 @@ namespace GridBuilder.Core
                     {
                         activeGridContainers.Add(container);
                     }
+                    else
+                    {
+                        containersToHide.Add(container);
+                    }
+                }
+                else if (container != null)
+                {
+                    containersToHide.Add(container);
                 }
             }
             
@@ -179,17 +93,9 @@ namespace GridBuilder.Core
                 return;
             }
             
-            // Show all active grids, hide others
-            foreach (var container in splineGridContainers)
-            {
-                if (container != null)
-                {
-                    if (activeGridContainers.Contains(container))
-                        container.ShowGrid();
-                    else
-                        container.HideGrid();
-                }
-            }
+            // Show active grids, hide others using event system
+            RequestShowGrids(activeGridContainers);
+            RequestHideGrids(containersToHide);
             
             // Use the first active container's grid for initial setup
             // The actual container used will be determined by mouse position
@@ -202,44 +108,19 @@ namespace GridBuilder.Core
                                             objectPlacer,
                                             soundFeedback,
                                             activeGridContainers);
-            OnClicked += PlaceStructure;
+            OnClicked += OnAction;
             OnExit += StopPlacement;
         }
 
-        public void StartRemoving()
+        public void StopPlacement()
         {
-            StopPlacement();
-            
-            // Show all grids for removal
-            foreach (var container in splineGridContainers)
-            {
-                if (container != null)
-                    container.ShowGrid();
-            }
-            
-            // Use first available grid for removal state
-            if (splineGridContainers.Count > 0 && splineGridContainers[0] != null)
-            {
-                activeGridContainers.Clear();
-                activeGridContainers.AddRange(splineGridContainers.Where(c => c != null));
-                
-                buildingState = new RemovingState(splineGridContainers[0].Grid,
-                                                preview,
-                                                splineGridContainers[0].GridData,
-                                                objectPlacer,
-                                                soundFeedback);
-            }
-            else
-            {
-                Debug.LogError("No spline grid containers available for removal");
-                return;
-            }
-            
-            OnClicked += PlaceStructure;
-            OnExit += StopPlacement;
+            OnClicked -= OnAction;
+            OnExit -= StopPlacement;
+            StopBuilding();
+            activeDatabase = null;
         }
 
-        void PlaceStructure()
+        protected override void OnAction()
         {
             if (IsPointerOverUI())
             {
@@ -268,61 +149,5 @@ namespace GridBuilder.Core
                 buildingState.OnAction(gridPosition);
             }
         }
-
-        void StopPlacement()
-        {
-            soundFeedback.PlaySound(SoundType.Click);
-            if (buildingState == null)
-                return;
-                
-            // Hide all grids
-            foreach (var container in splineGridContainers)
-            {
-                if (container != null)
-                    container.HideGrid();
-            }
-            
-            buildingState.EndState();
-            OnClicked -= PlaceStructure;
-            OnExit -= StopPlacement;
-            lastDetectedPosition = Vector3Int.zero;
-            buildingState = null;
-            activeGridContainers.Clear();
-            activeDatabase = null;
-        }
-
-        public Vector3 GetSelectedMapPosition()
-        {
-            Vector3 mousePos = Input.mousePosition;
-            mousePos.z = sceneCamera.nearClipPlane;
-            Ray ray = sceneCamera.ScreenPointToRay(mousePos);
-            RaycastHit hit;
-            
-            // Combine layer masks from all active grid containers
-            LayerMask combinedLayerMask = 0;
-            if (activeGridContainers != null && activeGridContainers.Count > 0)
-            {
-                foreach (var container in activeGridContainers)
-                {
-                    if (container != null)
-                    {
-                        combinedLayerMask |= container.PlacementLayerMask;
-                    }
-                }
-            }
-            else
-            {
-                combinedLayerMask = ~0; // Use all layers if no active containers
-            }
-            
-            if (Physics.Raycast(ray, out hit, Mathf.Infinity, combinedLayerMask))
-            {
-                lastPosition = hit.point;
-            }
-            return lastPosition;
-        }
-
-        public bool IsPointerOverUI()
-            => EventSystem.current.IsPointerOverGameObject();
     }
 }

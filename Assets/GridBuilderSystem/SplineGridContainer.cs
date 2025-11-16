@@ -65,6 +65,7 @@ namespace GridBuilder.Core
                 meshFilter = gridVisualization.AddComponent<MeshFilter>();
                 meshRenderer = gridVisualization.AddComponent<MeshRenderer>();
                 MeshCollider meshCollider = gridVisualization.AddComponent<MeshCollider>();
+                gridVisualization.SetActive(false);
                 
                 if (gridMaterial != null)
                 {
