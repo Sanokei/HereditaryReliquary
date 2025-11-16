@@ -975,9 +975,9 @@ MonoBehaviour:
   - m_EditModeType: 1
     m_Knots:
     - Position:
-        x: -50
+        x: -5
         y: 0
-        z: -50
+        z: -5
       TangentIn:
         x: 0
         y: 0
@@ -993,9 +993,9 @@ MonoBehaviour:
           z: 0
           w: 1
     - Position:
-        x: 50
+        x: 5
         y: 0
-        z: -50
+        z: -5
       TangentIn:
         x: 0
         y: 0
@@ -1011,9 +1011,9 @@ MonoBehaviour:
           z: 0
           w: 1
     - Position:
-        x: 50
+        x: 5
         y: 0
-        z: 50
+        z: 5
       TangentIn:
         x: 0
         y: 0
@@ -1029,9 +1029,9 @@ MonoBehaviour:
           z: 0
           w: 1
     - Position:
-        x: -50
+        x: -5
         y: 0
-        z: 50
+        z: 5
       TangentIn:
         x: 0
         y: 0
@@ -1079,7 +1079,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.SplineGridContainer
   gridMaterial: {fileID: 2100000, guid: 29f5a41931bdf4fa0852fa968e1fd614, type: 2}
-  gridCellSize: 10
+  gridCellSize: 1
   gridSize: {x: 10, y: 10}
   placementLayerMask:
     serializedVersion: 2

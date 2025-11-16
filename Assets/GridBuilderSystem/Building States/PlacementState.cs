@@ -127,7 +127,6 @@ namespace GridBuilder.Core
             {
                 groundY = grid.transform.position.y;
             }
-            placementPosition.y = groundY;
             
             Quaternion rotation = Quaternion.Euler(0, currentRotation, 0);
             
@@ -136,12 +135,123 @@ namespace GridBuilder.Core
             int databaseCellSize = database.CellSize;
             int containerCellSize = currentContainer != null ? currentContainer.GridCellSize : 1;
             CellSizePlacementMode placementMode = currentContainer != null ? currentContainer.PlacementMode : CellSizePlacementMode.ConvertCells;
-            Vector3 scale = Vector3.one;
+            Vector3 scale = prefab.transform.localScale;
             
             if (placementMode == CellSizePlacementMode.ScaleObject)
             {
                 float scaleFactor = (float)containerCellSize / databaseCellSize;
                 scale = prefab.transform.localScale * scaleFactor;
+            }
+            
+            // Calculate the object's bounds to ensure it doesn't clip through the floor
+            // Get bounds from prefab's mesh filters without instantiating
+            MeshFilter[] meshFilters = prefab.GetComponentsInChildren<MeshFilter>();
+            float bottomOffset = 0f;
+            
+            if (meshFilters.Length > 0)
+            {
+                // Calculate combined bounds in local space (relative to prefab root)
+                Bounds combinedLocalBounds = new Bounds();
+                bool boundsInitialized = false;
+                
+                foreach (MeshFilter meshFilter in meshFilters)
+                {
+                    if (meshFilter != null && meshFilter.sharedMesh != null)
+                    {
+                        // Get mesh bounds in mesh local space
+                        Bounds meshBounds = meshFilter.sharedMesh.bounds;
+                        
+                        // Transform mesh bounds to prefab root local space
+                        // Account for meshFilter's local position, rotation, and scale
+                        Transform meshTransform = meshFilter.transform;
+                        Vector3 localPos = meshTransform.localPosition;
+                        Quaternion localRot = meshTransform.localRotation;
+                        Vector3 localScale = meshTransform.localScale;
+                        
+                        // Calculate the 8 corners of the mesh bounds
+                        Vector3[] meshCorners = new Vector3[8];
+                        Vector3 meshCenter = meshBounds.center;
+                        Vector3 meshExtents = meshBounds.extents;
+                        
+                        meshCorners[0] = meshCenter + new Vector3(-meshExtents.x, -meshExtents.y, -meshExtents.z);
+                        meshCorners[1] = meshCenter + new Vector3(meshExtents.x, -meshExtents.y, -meshExtents.z);
+                        meshCorners[2] = meshCenter + new Vector3(-meshExtents.x, -meshExtents.y, meshExtents.z);
+                        meshCorners[3] = meshCenter + new Vector3(meshExtents.x, -meshExtents.y, meshExtents.z);
+                        meshCorners[4] = meshCenter + new Vector3(-meshExtents.x, meshExtents.y, -meshExtents.z);
+                        meshCorners[5] = meshCenter + new Vector3(meshExtents.x, meshExtents.y, -meshExtents.z);
+                        meshCorners[6] = meshCenter + new Vector3(-meshExtents.x, meshExtents.y, meshExtents.z);
+                        meshCorners[7] = meshCenter + new Vector3(meshExtents.x, meshExtents.y, meshExtents.z);
+                        
+                        // Transform corners to prefab root local space
+                        for (int i = 0; i < meshCorners.Length; i++)
+                        {
+                            // Scale, rotate, then translate
+                            meshCorners[i] = Vector3.Scale(meshCorners[i], localScale);
+                            meshCorners[i] = localRot * meshCorners[i];
+                            meshCorners[i] += localPos;
+                        }
+                        
+                        // Create bounds from transformed corners
+                        if (!boundsInitialized)
+                        {
+                            combinedLocalBounds = new Bounds(meshCorners[0], Vector3.zero);
+                            boundsInitialized = true;
+                        }
+                        
+                        foreach (Vector3 corner in meshCorners)
+                        {
+                            combinedLocalBounds.Encapsulate(corner);
+                        }
+                    }
+                }
+                
+                if (boundsInitialized)
+                {
+                    // Transform the local bounds by the rotation and scale that will be applied at root
+                    // Apply root scale to bounds
+                    Vector3 scaledCenter = Vector3.Scale(combinedLocalBounds.center, scale);
+                    Vector3 scaledSize = Vector3.Scale(combinedLocalBounds.size, scale);
+                    
+                    // Calculate the 8 corners of the bounding box in local space
+                    Vector3[] corners = new Vector3[8];
+                    Vector3 extents = scaledSize * 0.5f;
+                    
+                    corners[0] = scaledCenter + new Vector3(-extents.x, -extents.y, -extents.z);
+                    corners[1] = scaledCenter + new Vector3(extents.x, -extents.y, -extents.z);
+                    corners[2] = scaledCenter + new Vector3(-extents.x, -extents.y, extents.z);
+                    corners[3] = scaledCenter + new Vector3(extents.x, -extents.y, extents.z);
+                    corners[4] = scaledCenter + new Vector3(-extents.x, extents.y, -extents.z);
+                    corners[5] = scaledCenter + new Vector3(extents.x, extents.y, -extents.z);
+                    corners[6] = scaledCenter + new Vector3(-extents.x, extents.y, extents.z);
+                    corners[7] = scaledCenter + new Vector3(extents.x, extents.y, extents.z);
+                    
+                    // Rotate corners and center
+                    Vector3 rotatedCenter = rotation * scaledCenter;
+                    for (int i = 0; i < corners.Length; i++)
+                    {
+                        corners[i] = rotation * corners[i];
+                    }
+                    
+                    // Find the minimum Y after rotation
+                    float minY = float.MaxValue;
+                    foreach (Vector3 corner in corners)
+                    {
+                        minY = Mathf.Min(minY, corner.y);
+                    }
+                    
+                    // Adjust placement position so:
+                    // 1. Bounds center aligns with target position (X, Z)
+                    // 2. Bounds bottom aligns with ground (Y)
+                    placementPosition = new Vector3(
+                        placementPosition.x - rotatedCenter.x,
+                        groundY - minY,
+                        placementPosition.z - rotatedCenter.z);
+                }
+            }
+            else
+            {
+                // Fallback if no mesh filters found - just align Y with ground
+                placementPosition.y = groundY;
             }
             
             int index = objectPlacer.PlaceObject(prefab, placementPosition, rotation, scale);
@@ -494,23 +604,10 @@ namespace GridBuilder.Core
             // Get rotated cells for this calculation
             List<Vector3Int> rotatedCells = RotateOccupiedCells(occupiedCells, currentRotation);
             
-            // Calculate the center of all occupied cells (after rotation)
-            // This ensures multi-cell objects are properly centered
-            Vector3 centerWorld = Vector3.zero;
-            if (rotatedCells.Count > 0)
-            {
-                foreach (var cell in rotatedCells)
-                {
-                    Vector3Int worldCellPos = gridPosition + cell;
-                    centerWorld += grid.GetCellCenterWorld(worldCellPos);
-                }
-                centerWorld /= rotatedCells.Count;
-            }
-            else
-            {
-                // Fallback to origin cell center if no cells
-                centerWorld = grid.GetCellCenterWorld(gridPosition);
-            }
+            // PreviewCenter should be the world position of the grid cell under the mouse cursor
+            // This ensures the object's visual center aligns with the mouse cursor
+            // The object's pivot will be adjusted to align its bounds center with this position
+            Vector3 centerWorld = grid.GetCellCenterWorld(gridPosition);
 
             return new PlacementGeometry
             {

@@ -346,10 +346,54 @@ namespace GridBuilder.Core
                 groundY = grid.transform.position.y;
             }
             
-            previewObject.transform.position = new Vector3(
-                position.x,
-                groundY + previewYOffset,
-                position.z);
+            // Calculate the object's bounds to position it correctly
+            // Get all renderers in the preview object hierarchy
+            Renderer[] renderers = previewObject.GetComponentsInChildren<Renderer>();
+            if (renderers.Length > 0)
+            {
+                // Store current rotation
+                Quaternion currentRot = previewObject.transform.rotation;
+                
+                // Temporarily move to origin with identity rotation to calculate bounds accurately
+                previewObject.transform.position = Vector3.zero;
+                previewObject.transform.rotation = Quaternion.identity;
+                
+                // Calculate combined bounds at origin (no rotation)
+                Bounds combinedBounds = renderers[0].bounds;
+                for (int i = 1; i < renderers.Length; i++)
+                {
+                    combinedBounds.Encapsulate(renderers[i].bounds);
+                }
+                
+                // Calculate the offset from pivot to bounds center and bottom
+                // The bounds are in world space at origin, so bounds.center/min give us the local offsets
+                Vector3 boundsCenterLocal = combinedBounds.center;
+                Vector3 boundsMinLocal = combinedBounds.min;
+                
+                // Restore rotation before final positioning
+                previewObject.transform.rotation = currentRot;
+                
+                // Calculate offsets accounting for rotation
+                // Rotate the bounds center offset by current rotation to get world-space offset
+                Vector3 centerOffsetRotated = currentRot * boundsCenterLocal;
+                Vector3 minOffsetRotated = currentRot * boundsMinLocal;
+                
+                // Position the preview so:
+                // 1. Its bounds center aligns with the target position (X, Z)
+                // 2. Its bounds bottom aligns with the ground (Y)
+                previewObject.transform.position = new Vector3(
+                    position.x - centerOffsetRotated.x,
+                    groundY + previewYOffset - minOffsetRotated.y,
+                    position.z - centerOffsetRotated.z);
+            }
+            else
+            {
+                // Fallback if no renderers found
+                previewObject.transform.position = new Vector3(
+                    position.x,
+                    groundY + previewYOffset,
+                    position.z);
+            }
         }
 
         internal void StartShowingRemovePreview(Grid grid)
