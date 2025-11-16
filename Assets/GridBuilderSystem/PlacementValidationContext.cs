@@ -76,33 +76,73 @@ namespace GridBuilder.Core
 
         /// <summary>
         /// Gets object IDs from adjacent cells that belong to specific databases
+        /// Only checks containers whose layer mask matches the database's layer mask
         /// </summary>
         public List<int> GetAdjacentObjectIDsFromDatabases(List<ObjectsDatabaseSO> databases)
         {
-            List<int> allAdjacentIDs = GetAdjacentObjectIDs();
             List<int> filteredIDs = new List<int>();
 
-            if (databases == null || databases.Count == 0)
+            if (databases == null || databases.Count == 0 || activeContainers == null || activeContainers.Count == 0)
                 return filteredIDs;
 
-            // Check each adjacent object ID to see if it belongs to any of the required databases
-            foreach (var adjacentID in allAdjacentIDs)
+            // Define 4 directions in X/Z plane (N, S, E, W)
+            Vector3Int[] directions = new Vector3Int[]
             {
+                new Vector3Int(0, 0, 1),  // North
+                new Vector3Int(0, 0, -1), // South
+                new Vector3Int(1, 0, 0),  // East
+                new Vector3Int(-1, 0, 0)  // West
+            };
+
+            HashSet<int> foundIDs = new HashSet<int>();
+
+            // For each required database, check adjacent cells in containers that match its layer mask
+            foreach (var requiredDatabase in databases)
+            {
+                if (requiredDatabase == null || requiredDatabase.objectsData == null)
+                    continue;
+
+                // Filter containers by layer mask matching the database's layer mask
                 foreach (var container in activeContainers)
                 {
-                    if (container == null || container.ObjectsDatabase == null)
+                    if (container == null || container.Grid == null || container.GridData == null)
                         continue;
 
-                    // Check if this database contains the object ID
-                    foreach (var objData in container.ObjectsDatabase.objectsData)
+                    // Only check containers whose layer mask matches the database's layer mask
+                    if ((container.PlacementLayerMask.value & requiredDatabase.placementLayermask.value) == 0)
+                        continue;
+
+                    // Check each occupied cell for adjacent objects
+                    foreach (var cell in occupiedCells)
                     {
-                        if (objData.ID == adjacentID && databases.Contains(container.ObjectsDatabase))
+                        Vector3Int cellPos = gridPosition + cell;
+                        
+                        foreach (var direction in directions)
                         {
-                            if (!filteredIDs.Contains(adjacentID))
+                            Vector3Int adjacentPos = cellPos + direction;
+                            
+                            // Convert to container's grid space if needed
+                            Vector3Int containerPos = adjacentPos;
+                            if (referenceGrid != null && container.Grid != referenceGrid)
                             {
-                                filteredIDs.Add(adjacentID);
+                                Vector3 worldPos = referenceGrid.GetCellCenterWorld(adjacentPos);
+                                containerPos = container.Grid.WorldToCell(worldPos);
                             }
-                            break;
+
+                            int objectID = container.GridData.GetObjectIDAt(containerPos);
+                            if (objectID != -1 && !foundIDs.Contains(objectID))
+                            {
+                                // Check if this object ID exists in the required database
+                                foreach (var objData in requiredDatabase.objectsData)
+                                {
+                                    if (objData.ID == objectID)
+                                    {
+                                        foundIDs.Add(objectID);
+                                        filteredIDs.Add(objectID);
+                                        break;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -136,8 +176,8 @@ namespace GridBuilder.Core
 
                 if (targetDatabase != null)
                 {
-                    // Only count if container's database matches target database
-                    if (container.ObjectsDatabase != targetDatabase)
+                    // Only count from containers whose layer mask matches the database's layer mask
+                    if ((container.PlacementLayerMask.value & targetDatabase.placementLayermask.value) == 0)
                         continue;
 
                     // Count objects from specific database
@@ -150,9 +190,9 @@ namespace GridBuilder.Core
                     {
                         // Verify the object ID exists in the database before counting
                         bool objectExistsInDatabase = false;
-                        if (container.ObjectsDatabase.objectsData != null)
+                        if (targetDatabase.objectsData != null)
                         {
-                            foreach (var objData in container.ObjectsDatabase.objectsData)
+                            foreach (var objData in targetDatabase.objectsData)
                             {
                                 if (objData.ID == targetObjectID)
                                 {

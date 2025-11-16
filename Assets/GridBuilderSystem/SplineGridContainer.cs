@@ -13,9 +13,9 @@ namespace GridBuilder.Core
     {
         private SplineContainer splineContainer;
         [SerializeField] private Material gridMaterial;
-        private float gridCellSize = 1f;
+        [SerializeField, Min(1)] private int gridCellSize = 1;
+        [SerializeField, Min(1)] private Vector2 gridSize = new(10f,10f);
         [SerializeField] private LayerMask placementLayerMask;
-        [SerializeField] private ObjectsDatabaseSO objectsDatabase;
         
         private Grid grid;
         private GameObject gridVisualization;
@@ -27,8 +27,7 @@ namespace GridBuilder.Core
         public Grid Grid => grid;
         public GridData GridData => gridData;
         public LayerMask PlacementLayerMask => placementLayerMask;
-        public ObjectsDatabaseSO ObjectsDatabase => objectsDatabase;
-        public float GridCellSize => gridCellSize;
+        public int GridCellSize => gridCellSize;
         
         private void Awake()
         {
@@ -36,6 +35,7 @@ namespace GridBuilder.Core
             splineContainer = GetComponent<SplineContainer>();
             
             gridData = new GridData();
+            UpdateSplineFromGridSize();
             InitializeGrid();
             GenerateGridVisualization();
         }
@@ -129,12 +129,13 @@ namespace GridBuilder.Core
             }
             
             // Triangulate polygon (simple fan triangulation for convex polygons)
+            // Reverse winding order so normals point upward (counter-clockwise when viewed from above)
             List<int> triangles = new List<int>();
             for (int i = 1; i < projectedPoints.Count - 1; i++)
             {
                 triangles.Add(0);
-                triangles.Add(i);
                 triangles.Add(i + 1);
+                triangles.Add(i);
             }
             
             mesh.vertices = projectedPoints.ToArray();
@@ -336,12 +337,55 @@ namespace GridBuilder.Core
             return -1;
         }
         
+        /// <summary>
+        /// Updates the spline container to match the gridSize, creating a rectangular boundary
+        /// </summary>
+        private void UpdateSplineFromGridSize()
+        {
+            if (splineContainer == null)
+                return;
+                
+            var spline = splineContainer.Spline;
+            if (spline == null)
+                return;
+            
+            // Clear existing knots
+            spline.Clear();
+            
+            // Create a rectangle centered at origin with dimensions matching gridSize
+            // gridSize.x maps to X axis, gridSize.y maps to Z axis
+            float halfWidth = gridSize.x * 0.5f;
+            float halfHeight = gridSize.y * 0.5f;
+            
+            // Create 4 corners of the rectangle (in local space of splineContainer)
+            // Order: bottom-left, bottom-right, top-right, top-left (to form a closed loop)
+            BezierKnot knot1 = new BezierKnot(new Vector3(-halfWidth, 0f, -halfHeight));
+            BezierKnot knot2 = new BezierKnot(new Vector3(halfWidth, 0f, -halfHeight));
+            BezierKnot knot3 = new BezierKnot(new Vector3(halfWidth, 0f, halfHeight));
+            BezierKnot knot4 = new BezierKnot(new Vector3(-halfWidth, 0f, halfHeight));
+            
+            // Add knots to spline
+            spline.Add(knot1);
+            spline.Add(knot2);
+            spline.Add(knot3);
+            spline.Add(knot4);
+            
+            // Close the spline to form a loop
+            spline.Closed = true;
+        }
+        
         private void OnValidate()
         {
             // Get SplineContainer if not already set
             if (splineContainer == null)
             {
                 splineContainer = GetComponent<SplineContainer>();
+            }
+            
+            // Update spline when gridSize changes
+            if (splineContainer != null)
+            {
+                UpdateSplineFromGridSize();
             }
             
             if (Application.isPlaying && gridVisualization != null)

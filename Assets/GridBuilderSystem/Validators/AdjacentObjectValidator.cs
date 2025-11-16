@@ -36,23 +36,34 @@ namespace GridBuilder.Core
             {
                 // Need to check if we have adjacent objects from ALL required databases
                 // We need to verify that for each database, there's at least one adjacent object
+                // from containers whose layer mask matches the database's layer mask
                 foreach (var database in requiredDatabases)
                 {
+                    if (database == null)
+                        continue;
+
                     bool foundFromThisDatabase = false;
 
-                    // Check if any adjacent object belongs to this database
+                    // Check containers that match this database's layer mask
                     foreach (var container in context.activeContainers)
                     {
-                        if (container == null || container.ObjectsDatabase != database)
+                        if (container == null)
+                            continue;
+
+                        // Only check containers whose layer mask matches the database's layer mask
+                        if ((container.PlacementLayerMask.value & database.placementLayermask.value) == 0)
                             continue;
 
                         // Check if any of the adjacent IDs are in this database
-                        foreach (var objData in database.objectsData)
+                        if (database.objectsData != null)
                         {
-                            if (adjacentIDs.Contains(objData.ID))
+                            foreach (var objData in database.objectsData)
                             {
-                                foundFromThisDatabase = true;
-                                break;
+                                if (adjacentIDs.Contains(objData.ID))
+                                {
+                                    foundFromThisDatabase = true;
+                                    break;
+                                }
                             }
                         }
 

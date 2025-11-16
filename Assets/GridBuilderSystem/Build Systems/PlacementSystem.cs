@@ -69,7 +69,7 @@ namespace GridBuilder.Core
             // Find all spline grid containers that match the database's layer mask
             foreach (var container in allContainers)
             {
-                if (container != null && container.ObjectsDatabase == targetDatabase)
+                if (container != null)
                 {
                     // Check if layer masks match
                     if ((container.PlacementLayerMask.value & targetDatabase.placementLayermask.value) != 0)
@@ -80,10 +80,6 @@ namespace GridBuilder.Core
                     {
                         containersToHide.Add(container);
                     }
-                }
-                else if (container != null)
-                {
-                    containersToHide.Add(container);
                 }
             }
             

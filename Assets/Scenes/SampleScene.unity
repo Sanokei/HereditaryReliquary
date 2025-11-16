@@ -822,9 +822,9 @@ MonoBehaviour:
           z: 0
           w: 1
     - Position:
-        x: -5
+        x: 5
         y: 0
-        z: 5
+        z: -5
       TangentIn:
         x: 0
         y: 0
@@ -836,9 +836,9 @@ MonoBehaviour:
       Rotation:
         value:
           x: 0
-          y: 0.70710677
+          y: 0
           z: 0
-          w: 0.70710677
+          w: 1
     - Position:
         x: 5
         y: 0
@@ -854,31 +854,13 @@ MonoBehaviour:
       Rotation:
         value:
           x: 0
-          y: 0.70710677
+          y: 0
           z: 0
-          w: 0.70710677
-    - Position:
-        x: 5
-        y: 0
-        z: -5
-      TangentIn:
-        x: 0
-        y: 0
-        z: 0
-      TangentOut:
-        x: 0
-        y: 0
-        z: 0
-      Rotation:
-        value:
-          x: 0
-          y: 0.92387956
-          z: 0
-          w: -0.38268346
+          w: 1
     - Position:
         x: -5
         y: 0
-        z: -5
+        z: 5
       TangentIn:
         x: 0
         y: 0
@@ -890,19 +872,17 @@ MonoBehaviour:
       Rotation:
         value:
           x: 0
-          y: 1
+          y: 0
           z: 0
-          w: 0
+          w: 1
     m_MetaData:
-    - Mode: 1
+    - Mode: 4
       Tension: 0.5
-    - Mode: 1
+    - Mode: 4
       Tension: 0.5
-    - Mode: 1
+    - Mode: 4
       Tension: 0.5
-    - Mode: 1
-      Tension: 0.5
-    - Mode: 1
+    - Mode: 4
       Tension: 0.5
     m_Closed: 1
     m_IntData:
@@ -928,10 +908,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.SplineGridContainer
   gridMaterial: {fileID: 2100000, guid: 29f5a41931bdf4fa0852fa968e1fd614, type: 2}
+  gridCellSize: 1
+  gridSize: {x: 10, y: 10}
   placementLayerMask:
     serializedVersion: 2
     m_Bits: 64
-  objectsDatabase: {fileID: 11400000, guid: 506480ae606a30f46b32decc9c00ae95, type: 2}
 --- !u!4 &1448516284
 Transform:
   m_ObjectHideFlags: 0
@@ -1009,6 +990,42 @@ MonoBehaviour:
       Rotation:
         value:
           x: 0
+          y: 0.92387956
+          z: 0
+          w: 0.38268346
+    - Position:
+        x: 5
+        y: 0
+        z: -5
+      TangentIn:
+        x: 0
+        y: 0
+        z: 0
+      TangentOut:
+        x: 0
+        y: 0
+        z: 0
+      Rotation:
+        value:
+          x: 0
+          y: 0
+          z: 0
+          w: 1
+    - Position:
+        x: 5
+        y: 0
+        z: 5
+      TangentIn:
+        x: 0
+        y: 0
+        z: 0
+      TangentOut:
+        x: 0
+        y: 0
+        z: 0
+      Rotation:
+        value:
+          x: 0
           y: 0
           z: 0
           w: 1
@@ -1027,73 +1044,17 @@ MonoBehaviour:
       Rotation:
         value:
           x: 0
-          y: 0.70710677
+          y: 0
           z: 0
-          w: 0.70710677
-    - Position:
-        x: 5
-        y: 0
-        z: 5
-      TangentIn:
-        x: 0
-        y: 0
-        z: 0
-      TangentOut:
-        x: 0
-        y: 0
-        z: 0
-      Rotation:
-        value:
-          x: 0
-          y: 0.70710677
-          z: 0
-          w: 0.70710677
-    - Position:
-        x: 5
-        y: 0
-        z: -5
-      TangentIn:
-        x: 0
-        y: 0
-        z: 0
-      TangentOut:
-        x: 0
-        y: 0
-        z: 0
-      Rotation:
-        value:
-          x: 0
-          y: 0.92387956
-          z: 0
-          w: -0.38268346
-    - Position:
-        x: -5
-        y: 0
-        z: -5
-      TangentIn:
-        x: 0
-        y: 0
-        z: 0
-      TangentOut:
-        x: 0
-        y: 0
-        z: 0
-      Rotation:
-        value:
-          x: 0
-          y: 1
-          z: 0
-          w: 0
+          w: 1
     m_MetaData:
     - Mode: 1
       Tension: 0.5
-    - Mode: 1
+    - Mode: 4
       Tension: 0.5
     - Mode: 1
       Tension: 0.5
-    - Mode: 1
-      Tension: 0.5
-    - Mode: 1
+    - Mode: 4
       Tension: 0.5
     m_Closed: 1
     m_IntData:
@@ -1119,10 +1080,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.SplineGridContainer
   gridMaterial: {fileID: 2100000, guid: 29f5a41931bdf4fa0852fa968e1fd614, type: 2}
+  gridCellSize: 1
+  gridSize: {x: 10, y: 10}
   placementLayerMask:
     serializedVersion: 2
     m_Bits: 64
-  objectsDatabase: {fileID: 11400000, guid: 506480ae606a30f46b32decc9c00ae95, type: 2}
 --- !u!4 &1511650090
 Transform:
   m_ObjectHideFlags: 0
