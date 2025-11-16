@@ -19,6 +19,17 @@ namespace GridBuilder.Core
             return placedGameObjects.Count - 1;
         }
         
+        // Overload with scale
+        public int PlaceObject(GameObject prefab, Vector3 position, Quaternion rotation, Vector3 scale)
+        {
+            GameObject newObject = Instantiate(prefab);
+            newObject.transform.position = position;
+            newObject.transform.rotation = rotation;
+            newObject.transform.localScale = scale;
+            placedGameObjects.Add(newObject);
+            return placedGameObjects.Count - 1;
+        }
+        
         // Overload for backward compatibility
         public int PlaceObject(GameObject prefab, Vector3 position)
         {

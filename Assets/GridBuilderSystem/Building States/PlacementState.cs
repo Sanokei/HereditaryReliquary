@@ -55,20 +55,35 @@ namespace GridBuilder.Core
             selectedObjectIndex = database.objectsData.FindIndex(data => data.ID == ID);
             if (selectedObjectIndex > -1)
             {
-                // Convert occupied cells from database cell size to container cell size for preview
                 List<Vector3Int> databaseOccupiedCells = database.objectsData[selectedObjectIndex].OccupiedCells;
-                int databaseCellSize = database.cellSize;
+                int databaseCellSize = database.CellSize;
                 int containerCellSize = currentContainer != null ? currentContainer.GridCellSize : 1;
-                List<Vector3Int> convertedOccupiedCells = CellSizeConverter.ConvertOccupiedCells(
-                    databaseOccupiedCells,
-                    databaseCellSize,
-                    containerCellSize
-                );
+                CellSizePlacementMode placementMode = currentContainer != null ? currentContainer.PlacementMode : CellSizePlacementMode.ConvertCells;
+                float scaleFactor = 1f;
+                List<Vector3Int> cellsForPreview = databaseOccupiedCells;
+                
+                // Handle placement mode (from container, not database)
+                if (placementMode == CellSizePlacementMode.ScaleObject)
+                {
+                    // Scale mode: scale the object, use original cells
+                    scaleFactor = (float)containerCellSize / databaseCellSize;
+                    cellsForPreview = new List<Vector3Int>(databaseOccupiedCells);
+                }
+                else
+                {
+                    // Convert mode: convert cells, no scaling
+                    cellsForPreview = CellSizeConverter.ConvertOccupiedCells(
+                        databaseOccupiedCells,
+                        databaseCellSize,
+                        containerCellSize
+                    );
+                }
                 
                 previewSystem.StartShowingPlacementPreview(
                     database.objectsData[selectedObjectIndex].Prefab,
-                    convertedOccupiedCells,
-                    grid);
+                    cellsForPreview,
+                    grid,
+                    scaleFactor);
                 
                 // Initialize previous references after first preview creation
                 previousContainer = currentContainer;
@@ -98,7 +113,7 @@ namespace GridBuilder.Core
             bool placementValidity = CheckPlacementValidity(gridPosition, selectedObjectIndex, out geometry);
             if (placementValidity == false)
             {
-                soundFeedback.PlaySound(SoundType.wrongPlacement);
+                soundFeedback.PlaySound(SoundType.WrongPlacement);
                 return;
             }
             soundFeedback.PlaySound(SoundType.Place);
@@ -106,9 +121,30 @@ namespace GridBuilder.Core
             // Calculate placement position - use the preview center which accounts for multi-cell objects and rotation
             Vector3 placementPosition = geometry.PreviewCenter;
             
+            // Keep object on ground level
+            float groundY = 0f;
+            if (grid != null)
+            {
+                groundY = grid.transform.position.y;
+            }
+            placementPosition.y = groundY;
+            
             Quaternion rotation = Quaternion.Euler(0, currentRotation, 0);
-            int index = objectPlacer.PlaceObject(database.objectsData[selectedObjectIndex].Prefab,
-                placementPosition, rotation);
+            
+            // Apply scaling if in ScaleObject mode
+            GameObject prefab = database.objectsData[selectedObjectIndex].Prefab;
+            int databaseCellSize = database.CellSize;
+            int containerCellSize = currentContainer != null ? currentContainer.GridCellSize : 1;
+            CellSizePlacementMode placementMode = currentContainer != null ? currentContainer.PlacementMode : CellSizePlacementMode.ConvertCells;
+            Vector3 scale = Vector3.one;
+            
+            if (placementMode == CellSizePlacementMode.ScaleObject)
+            {
+                float scaleFactor = (float)containerCellSize / databaseCellSize;
+                scale = prefab.transform.localScale * scaleFactor;
+            }
+            
+            int index = objectPlacer.PlaceObject(prefab, placementPosition, rotation, scale);
 
             // Get rotated occupied cells (already converted to container cell size in CheckPlacementValidity)
             List<Vector3Int> rotatedCells = RotateOccupiedCells(geometry.OccupiedCells, currentRotation);
@@ -137,14 +173,26 @@ namespace GridBuilder.Core
             // Get occupied cells from database (in database cell size space)
             List<Vector3Int> databaseOccupiedCells = database.objectsData[selectedObjectIndex].OccupiedCells;
             
-            // Convert from database cell size to container cell size
-            int databaseCellSize = database.cellSize;
+            int databaseCellSize = database.CellSize;
             int containerCellSize = currentContainer != null ? currentContainer.GridCellSize : 1;
-            List<Vector3Int> occupiedCells = CellSizeConverter.ConvertOccupiedCells(
-                databaseOccupiedCells, 
-                databaseCellSize, 
-                containerCellSize
-            );
+            CellSizePlacementMode placementMode = currentContainer != null ? currentContainer.PlacementMode : CellSizePlacementMode.ConvertCells;
+            List<Vector3Int> occupiedCells;
+            
+            // Handle placement mode (from container, not database)
+            if (placementMode == CellSizePlacementMode.ScaleObject)
+            {
+                // Scale mode: use original cells without conversion
+                occupiedCells = new List<Vector3Int>(databaseOccupiedCells);
+            }
+            else
+            {
+                // Convert mode: convert cells from database cell size to container cell size
+                occupiedCells = CellSizeConverter.ConvertOccupiedCells(
+                    databaseOccupiedCells, 
+                    databaseCellSize, 
+                    containerCellSize
+                );
+            }
             
             geometry = CalculatePlacementGeometry(gridPosition, occupiedCells);
             
@@ -309,19 +357,35 @@ namespace GridBuilder.Core
                     if (selectedObjectIndex >= 0 && selectedObjectIndex < database.objectsData.Count)
                     {
                         List<Vector3Int> databaseOccupiedCells = database.objectsData[selectedObjectIndex].OccupiedCells;
-                        int databaseCellSize = database.cellSize;
+                        int databaseCellSize = database.CellSize;
                         int containerCellSize = currentContainer.GridCellSize;
-                        List<Vector3Int> convertedOccupiedCells = CellSizeConverter.ConvertOccupiedCells(
-                            databaseOccupiedCells,
-                            databaseCellSize,
-                            containerCellSize
-                        );
+                        CellSizePlacementMode placementMode = currentContainer.PlacementMode;
+                        float scaleFactor = 1f;
+                        List<Vector3Int> cellsForPreview;
+                        
+                        // Handle placement mode (from container, not database)
+                        if (placementMode == CellSizePlacementMode.ScaleObject)
+                        {
+                            // Scale mode: scale the object, use original cells
+                            scaleFactor = (float)containerCellSize / databaseCellSize;
+                            cellsForPreview = new List<Vector3Int>(databaseOccupiedCells);
+                        }
+                        else
+                        {
+                            // Convert mode: convert cells, no scaling
+                            cellsForPreview = CellSizeConverter.ConvertOccupiedCells(
+                                databaseOccupiedCells,
+                                databaseCellSize,
+                                containerCellSize
+                            );
+                        }
                         
                         // Update preview system with new grid and converted cells
                         previewSystem.StartShowingPlacementPreview(
                             database.objectsData[selectedObjectIndex].Prefab,
-                            convertedOccupiedCells,
-                            grid);
+                            cellsForPreview,
+                            grid,
+                            scaleFactor);
                         previewSystem.SetRotation(currentRotation);
                     }
                     

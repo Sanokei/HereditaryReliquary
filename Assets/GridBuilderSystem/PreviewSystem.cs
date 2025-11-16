@@ -22,6 +22,7 @@ namespace GridBuilder.Core
         private Grid grid;
         private float currentRotation = 0f;
         private MeshFilter cellIndicatorMeshFilter;
+        private Vector3 originalPreviewScale = Vector3.one;
 
         private void Awake()
         {
@@ -60,12 +61,22 @@ namespace GridBuilder.Core
             cellIndicator.SetActive(false);
         }
 
-        public void StartShowingPlacementPreview(GameObject prefab, List<Vector3Int> occupiedCells, Grid grid)
+        public void StartShowingPlacementPreview(GameObject prefab, List<Vector3Int> occupiedCells, Grid grid, float scaleFactor = 1f)
         {
             this.grid = grid;
             currentOccupiedCells = new List<Vector3Int>(occupiedCells);
             currentRotation = 0f;
             previewObject = Instantiate(prefab);
+            
+            // Store original scale before any modifications
+            originalPreviewScale = prefab.transform.localScale;
+            
+            // Apply scale factor if provided (for scaling mode)
+            if (scaleFactor != 1f)
+            {
+                previewObject.transform.localScale = originalPreviewScale * scaleFactor;
+            }
+            
             PreparePreview(previewObject);
             PrepareCursor(occupiedCells);
             
@@ -258,7 +269,10 @@ namespace GridBuilder.Core
 
         private void PreparePreview(GameObject previewObject)
         {
+            // Apply slight scale increase for visibility (on top of any existing scale)
+            // This helps distinguish preview from placed objects
             previewObject.transform.localScale = previewObject.transform.localScale * 1.01f;
+            
             Renderer[] renderers = previewObject.GetComponentsInChildren<Renderer>();
             foreach (Renderer renderer in renderers)
             {
@@ -324,9 +338,17 @@ namespace GridBuilder.Core
         {
             // Preview object pivot should align with grid position
             // The position passed in is the grid cell center
+            // Keep preview on ground level (Y = 0) regardless of cell size
+            float groundY = 0f;
+            if (grid != null)
+            {
+                // Use grid's transform position Y as ground level
+                groundY = grid.transform.position.y;
+            }
+            
             previewObject.transform.position = new Vector3(
                 position.x,
-                position.y + previewYOffset,
+                groundY + previewYOffset,
                 position.z);
         }
 

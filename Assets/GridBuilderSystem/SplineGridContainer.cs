@@ -16,6 +16,7 @@ namespace GridBuilder.Core
         [SerializeField, Min(1)] private int gridCellSize = 1;
         [SerializeField, Min(1)] private Vector2 gridSize = new(10f,10f);
         [SerializeField] private LayerMask placementLayerMask;
+        [SerializeField] private CellSizePlacementMode placementMode = CellSizePlacementMode.ConvertCells;
         
         private Grid grid;
         private GameObject gridVisualization;
@@ -29,6 +30,7 @@ namespace GridBuilder.Core
         public GridData GridData => gridData;
         public LayerMask PlacementLayerMask => placementLayerMask;
         public int GridCellSize => gridCellSize;
+        public CellSizePlacementMode PlacementMode => placementMode;
         
         private void Awake()
         {

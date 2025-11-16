@@ -10,7 +10,6 @@ namespace GridBuilder.Core
 {
     public class RemovalSystem : BaseBuildingSystem
     {
-        [SerializeField] AudioClip wrongPlacementClip;
         protected override void UpdateStateForContainer(Vector3Int gridPosition, SplineGridContainer container)
         {
             (buildingState as RemovingState).UpdateState(gridPosition, container);

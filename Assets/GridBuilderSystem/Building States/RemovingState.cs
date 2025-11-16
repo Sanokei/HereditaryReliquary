@@ -75,7 +75,7 @@ namespace GridBuilder.Core
             if (selectedData == null)
             {
                 //sound
-                soundFeedback.PlaySound(SoundType.wrongPlacement);
+                soundFeedback.PlaySound(SoundType.WrongPlacement);
             }
             else
             {

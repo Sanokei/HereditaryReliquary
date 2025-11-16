@@ -10,8 +10,6 @@ namespace GridBuilder.Core
 {
     public class PlacementSystem : BaseBuildingSystem
     {
-        [SerializeField] AudioClip correctPlacementClip;
-
         private ObjectsDatabaseSO activeDatabase;
         
         protected override void HandleSystemSpecificInput()

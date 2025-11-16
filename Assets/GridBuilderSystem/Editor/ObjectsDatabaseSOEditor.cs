@@ -37,7 +37,7 @@ namespace GridBuilder.Core
             SerializedProperty cellSizeProp = serializedObject.FindProperty("cellSize");
             if (cellSizeProp != null)
             {
-                EditorGUILayout.PropertyField(cellSizeProp, new GUIContent("Cell Size", "The cell size for objects in this database. Objects defined with this cell size will be converted to match container cell sizes when placed."));
+                EditorGUILayout.PropertyField(cellSizeProp, new GUIContent("Cell Size", "The cell size for objects in this database."));
             }
             
             EditorGUILayout.Space();

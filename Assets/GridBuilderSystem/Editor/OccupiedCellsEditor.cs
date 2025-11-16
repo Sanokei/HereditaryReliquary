@@ -50,7 +50,7 @@ namespace GridBuilder.Core
         {
             objectData = data;
             parentDatabase = database;
-            cellSize = database != null ? database.cellSize : 1f; // Use database cell size
+            cellSize = database != null ? database.CellSize : 1f; // Use database cell size
             
             // Load existing occupied cells
             occupiedCells.Clear();
@@ -99,15 +99,60 @@ namespace GridBuilder.Core
             // Apply see-through material to all renderers
             ApplyPreviewMaterial();
             
-            // Calculate bounds first to determine offset
+            // Calculate initial bounds (object is at origin, transform.position = 0,0,0)
             CalculatePrefabBounds();
             
-            // Position prefab so its minimum corner aligns with grid origin (0,0,0)
-            // This ensures the grid and prefab are aligned
-            Vector3 offset = -prefabBounds.min;
-            previewInstance.transform.position = offset;
+            // Calculate grid dimensions first to know the total grid size
+            Vector3 size = prefabBounds.size;
+            Vector3Int tempGridDimensions = new Vector3Int(
+                Mathf.CeilToInt(size.x / cellSize),
+                Mathf.CeilToInt(size.y / cellSize),
+                Mathf.CeilToInt(size.z / cellSize)
+            );
             
-            // Recalculate bounds after positioning
+            // Position prefab so its bounds align with the grid cells
+            // The grid floor will be created at (0, prefabBounds.min.y - 0.01f, 0) AFTER object is positioned
+            // Grid extends from (0,0,0) to (gridDimensions.x * cellSize, 0, gridDimensions.z * cellSize)
+            // When cellSize > 1, the grid may be larger than the prefab (due to CeilToInt), so center it
+            
+            // Calculate total grid size in world units
+            float gridWidth = tempGridDimensions.x * cellSize;
+            float gridDepth = tempGridDimensions.z * cellSize;
+            
+            // Calculate extra space due to ceiling operation
+            float extraSpaceX = gridWidth - prefabBounds.size.x;
+            float extraSpaceZ = gridDepth - prefabBounds.size.z;
+            
+            // Store the offset from transform.position to bounds.min
+            Vector3 boundsMinOffset = prefabBounds.min - previewInstance.transform.position;
+            
+            // Step 1: Position X and Z so bounds.min aligns with (extraSpaceX/2, 0, extraSpaceZ/2)
+            // This centers the prefab in the grid when there's extra space
+            Vector3 targetBoundsMinXZ = new Vector3(extraSpaceX * 0.5f, 0f, extraSpaceZ * 0.5f);
+            Vector3 currentBoundsMinXZ = new Vector3(prefabBounds.min.x, 0f, prefabBounds.min.z);
+            Vector3 offsetXZ = targetBoundsMinXZ - currentBoundsMinXZ;
+            previewInstance.transform.position = previewInstance.transform.position + offsetXZ;
+            
+            // Recalculate bounds after X/Z move
+            CalculatePrefabBounds();
+            
+            // Recalculate bounds min offset after X/Z move
+            Vector3 boundsMinOffsetAfterXZ = prefabBounds.min - previewInstance.transform.position;
+            
+            // Step 2: Position Y so bounds.min.y aligns with grid floor Y
+            // Grid floor will be at y = prefabBounds.min.y - 0.01f
+            float gridFloorY = prefabBounds.min.y - 0.01f;
+            Vector3 targetBoundsMin = new Vector3(extraSpaceX * 0.5f, gridFloorY, extraSpaceZ * 0.5f);
+            
+            // Calculate where transform should be so bounds.min = targetBoundsMin
+            // transform.position + boundsMinOffsetAfterXZ = targetBoundsMin
+            // transform.position = targetBoundsMin - boundsMinOffsetAfterXZ
+            // But we only want to adjust Y, so:
+            Vector3 currentPos = previewInstance.transform.position;
+            float targetY = targetBoundsMin.y - boundsMinOffsetAfterXZ.y;
+            previewInstance.transform.position = new Vector3(currentPos.x, targetY, currentPos.z);
+            
+            // Final bounds calculation
             CalculatePrefabBounds();
         }
         
@@ -173,7 +218,7 @@ namespace GridBuilder.Core
             meshRenderer.material = floorMaterial;
             
             // Position grid floor at the bottom of the prefab bounds
-            // Grid floor's local (0,0,0) aligns with prefab's minimum corner (which is now at world origin)
+            // Grid floor is positioned so cell (0,0,0) starts at (0,0,0) in local space
             gridFloor.transform.position = new Vector3(
                 0,
                 prefabBounds.min.y - 0.01f,
@@ -296,13 +341,13 @@ namespace GridBuilder.Core
             
             if (renderers.Length == 0)
             {
-                // Fallback to a default bounds
-                prefabBounds = new Bounds(Vector3.zero, Vector3.one);
+                // Throw error for not having renderers
+                Debug.LogError($"{objectData.Prefab.name} has no mesh renderers found in the prefab hierarchy");
                 return;
             }
             
             // Calculate combined bounds
-            prefabBounds = renderers[0].bounds;
+            prefabBounds = renderers[0].bounds; 
             for (int i = 1; i < renderers.Length; i++)
             {
                 prefabBounds.Encapsulate(renderers[i].bounds);
@@ -319,18 +364,18 @@ namespace GridBuilder.Core
                 Mathf.CeilToInt(size.z / cellSize)
             );
             
-            // Grid origin is at (0,0,0) since prefab is positioned so its min corner is at origin
+            // Grid origin is at (0,0,0), prefab is centered in cell (0,0,0)
             gridOrigin = Vector3.zero;
         }
         
         private void CreateMaterials()
         {
             // Grid line material
-            gridMaterial = new Material(Shader.Find("Sprites/Default"));
+            gridMaterial = new Material(Shader.Find("Unlit (Vertex Color)"));
             gridMaterial.color = new Color(0.5f, 0.5f, 0.5f, 0.3f);
             
             // Occupied cell material (green)
-            occupiedCellMaterial = new Material(Shader.Find("Sprites/Default"));
+            occupiedCellMaterial = new Material(Shader.Find("Unlit (Vertex Color)"));
             occupiedCellMaterial.color = new Color(0f, 1f, 0f, 0.5f);
             
             // Empty cell material (transparent)

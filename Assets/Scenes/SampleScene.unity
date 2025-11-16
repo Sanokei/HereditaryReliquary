@@ -168,7 +168,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 05d8d0ba38071ce48a092683e5308582, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.RemovalSystem
-  wrongPlacementClip: {fileID: 0}
 --- !u!114 &88705475
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -181,7 +180,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a395c162ace226f42be3cfee5433e025, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.PlacementSystem
-  correctPlacementClip: {fileID: 0}
 --- !u!114 &88705476
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -913,6 +911,7 @@ MonoBehaviour:
   placementLayerMask:
     serializedVersion: 2
     m_Bits: 128
+  placementMode: 0
 --- !u!4 &1448516284
 Transform:
   m_ObjectHideFlags: 0
@@ -1085,6 +1084,7 @@ MonoBehaviour:
   placementLayerMask:
     serializedVersion: 2
     m_Bits: 64
+  placementMode: 0
 --- !u!4 &1511650090
 Transform:
   m_ObjectHideFlags: 0
