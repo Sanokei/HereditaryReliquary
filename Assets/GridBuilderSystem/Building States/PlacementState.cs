@@ -122,20 +122,60 @@ namespace GridBuilder.Core
             // Get rotated cells for validity check
             List<Vector3Int> rotatedCells = RotateOccupiedCells(occupiedCells, currentRotation);
             
-            // Check across all active containers if available
+            // First, do standard placement checks (collision, boundaries, etc.)
+            bool standardCheckPassed = false;
             if (splineGridContainers != null && splineGridContainers.Count > 0)
             {
-                return CanPlaceObjectAcrossContainers(geometry.Origin, rotatedCells);
+                standardCheckPassed = CanPlaceObjectAcrossContainers(geometry.Origin, rotatedCells);
             }
-            
-            // Check if within spline boundary if current container is available
-            if (currentContainer != null)
+            else if (currentContainer != null)
             {
-                return currentContainer.CanPlaceObjectAt(geometry.Origin, rotatedCells);
+                standardCheckPassed = currentContainer.CanPlaceObjectAt(geometry.Origin, rotatedCells);
             }
-            
-            // Fallback to grid data check only
-            return gridData.CanPlaceObejctAt(geometry.Origin, rotatedCells);
+            else
+            {
+                standardCheckPassed = gridData.CanPlaceObejctAt(geometry.Origin, rotatedCells);
+            }
+
+            // If standard checks fail, no need to check validators
+            if (!standardCheckPassed)
+                return false;
+
+            // Now check custom validators if any are defined
+            ObjectData objectData = database.objectsData[selectedObjectIndex];
+            if (objectData.placementValidators != null && objectData.placementValidators.Count > 0)
+            {
+                // Create validation context
+                PlacementValidationContext context = new PlacementValidationContext
+                {
+                    gridPosition = geometry.Origin,
+                    occupiedCells = rotatedCells,
+                    activeContainers = splineGridContainers != null && splineGridContainers.Count > 0 
+                        ? splineGridContainers 
+                        : (currentContainer != null ? new List<SplineGridContainer> { currentContainer } : new List<SplineGridContainer>()),
+                    currentContainer = currentContainer,
+                    database = database,
+                    objectID = objectData.ID,
+                    rotation = currentRotation,
+                    referenceGrid = grid
+                };
+
+                // Check all validators - all must pass
+                foreach (var validator in objectData.placementValidators)
+                {
+                    if (validator == null)
+                        continue;
+
+                    if (!validator.ValidatePlacement(context))
+                    {
+                        // Validator failed
+                        return false;
+                    }
+                }
+            }
+
+            // All checks passed
+            return true;
         }
         
         /// <summary>

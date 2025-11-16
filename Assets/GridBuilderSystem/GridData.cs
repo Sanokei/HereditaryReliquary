@@ -130,6 +130,141 @@ namespace GridBuilder.Core
                 placedObjects.Remove(pos);
             }
         }
+
+        /// <summary>
+        /// Gets the object ID at a specific grid position
+        /// </summary>
+        public int GetObjectIDAt(Vector3Int gridPosition)
+        {
+            if (placedObjects.ContainsKey(gridPosition))
+            {
+                return placedObjects[gridPosition].ID;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// Gets object IDs from adjacent cells (4 directions: N, S, E, W in X/Z plane)
+        /// </summary>
+        public List<int> GetAdjacentObjectIDs(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
+        {
+            List<int> adjacentIDs = new List<int>();
+            HashSet<int> foundIDs = new HashSet<int>();
+
+            // Define 4 directions in X/Z plane (N, S, E, W)
+            Vector3Int[] directions = new Vector3Int[]
+            {
+                new Vector3Int(0, 0, 1),  // North
+                new Vector3Int(0, 0, -1), // South
+                new Vector3Int(1, 0, 0),  // East
+                new Vector3Int(-1, 0, 0)  // West
+            };
+
+            List<Vector3Int> positionsToCheck = CalculatePositions(gridPosition, occupiedCells);
+
+            foreach (var pos in positionsToCheck)
+            {
+                foreach (var direction in directions)
+                {
+                    Vector3Int adjacentPos = pos + direction;
+                    if (placedObjects.ContainsKey(adjacentPos))
+                    {
+                        int objectID = placedObjects[adjacentPos].ID;
+                        if (!foundIDs.Contains(objectID))
+                        {
+                            foundIDs.Add(objectID);
+                            adjacentIDs.Add(objectID);
+                        }
+                    }
+                }
+            }
+
+            return adjacentIDs;
+        }
+
+        /// <summary>
+        /// Counts all objects with the given ID
+        /// </summary>
+        public int CountObjectsByID(int objectID)
+        {
+            HashSet<int> countedObjects = new HashSet<int>();
+            int count = 0;
+
+            foreach (var kvp in placedObjects)
+            {
+                if (kvp.Value.ID == objectID)
+                {
+                    // Count unique objects (by checking if we've seen this object's index before)
+                    if (!countedObjects.Contains(kvp.Value.PlacedObjectIndex))
+                    {
+                        countedObjects.Add(kvp.Value.PlacedObjectIndex);
+                        count++;
+                    }
+                }
+            }
+
+            return count;
+        }
+
+        /// <summary>
+        /// Counts all objects from the given database
+        /// Note: This requires checking object IDs against the database, so it's a helper that works with database reference
+        /// </summary>
+        public int CountObjectsByDatabase(ObjectsDatabaseSO database)
+        {
+            if (database == null || database.objectsData == null)
+                return 0;
+
+            HashSet<int> databaseObjectIDs = new HashSet<int>();
+            foreach (var objData in database.objectsData)
+            {
+                databaseObjectIDs.Add(objData.ID);
+            }
+
+            HashSet<int> countedObjects = new HashSet<int>();
+            int count = 0;
+
+            foreach (var kvp in placedObjects)
+            {
+                if (databaseObjectIDs.Contains(kvp.Value.ID))
+                {
+                    // Count unique objects
+                    if (!countedObjects.Contains(kvp.Value.PlacedObjectIndex))
+                    {
+                        countedObjects.Add(kvp.Value.PlacedObjectIndex);
+                        count++;
+                    }
+                }
+            }
+
+            return count;
+        }
+
+        /// <summary>
+        /// Gets the total count of all unique objects in the grid
+        /// </summary>
+        public int GetAllObjectCount()
+        {
+            HashSet<int> uniqueObjects = new HashSet<int>();
+            foreach (var kvp in placedObjects)
+            {
+                uniqueObjects.Add(kvp.Value.PlacedObjectIndex);
+            }
+            return uniqueObjects.Count;
+        }
+
+        /// <summary>
+        /// Gets all unique object IDs in the grid
+        /// </summary>
+        public List<int> GetAllObjectIDs()
+        {
+            HashSet<int> uniqueIDs = new HashSet<int>();
+            foreach (var kvp in placedObjects)
+            {
+                uniqueIDs.Add(kvp.Value.ID);
+            }
+            return new List<int>(uniqueIDs);
+        }
     }
 
     public class PlacementData
