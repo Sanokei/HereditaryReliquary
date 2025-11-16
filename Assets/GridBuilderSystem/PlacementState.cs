@@ -85,8 +85,8 @@ namespace GridBuilder.Core
             }
             soundFeedback.PlaySound(SoundType.Place);
             
-            // Calculate placement position - use the grid position directly
-            Vector3 placementPosition = grid.GetCellCenterWorld(geometry.Origin);
+            // Calculate placement position - use the preview center which accounts for multi-cell objects and rotation
+            Vector3 placementPosition = geometry.PreviewCenter;
             
             Quaternion rotation = Quaternion.Euler(0, currentRotation, 0);
             int index = objectPlacer.PlaceObject(database.objectsData[selectedObjectIndex].Prefab,
@@ -304,13 +304,32 @@ namespace GridBuilder.Core
         
         private PlacementGeometry CalculatePlacementGeometry(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
         {
-            Vector3 pointerCellCenter = grid.GetCellCenterWorld(gridPosition);
+            // Get rotated cells for this calculation
+            List<Vector3Int> rotatedCells = RotateOccupiedCells(occupiedCells, currentRotation);
+            
+            // Calculate the center of all occupied cells (after rotation)
+            // This ensures multi-cell objects are properly centered
+            Vector3 centerWorld = Vector3.zero;
+            if (rotatedCells.Count > 0)
+            {
+                foreach (var cell in rotatedCells)
+                {
+                    Vector3Int worldCellPos = gridPosition + cell;
+                    centerWorld += grid.GetCellCenterWorld(worldCellPos);
+                }
+                centerWorld /= rotatedCells.Count;
+            }
+            else
+            {
+                // Fallback to origin cell center if no cells
+                centerWorld = grid.GetCellCenterWorld(gridPosition);
+            }
 
             return new PlacementGeometry
             {
                 Origin = gridPosition,
                 OccupiedCells = occupiedCells,
-                PreviewCenter = pointerCellCenter
+                PreviewCenter = centerWorld
             };
         }
         

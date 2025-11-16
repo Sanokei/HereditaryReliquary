@@ -22,3 +22,16 @@ MonoBehaviour:
     - {x: 0, y: 0, z: 0}
     - {x: 1, y: 0, z: 0}
     <Prefab>k__BackingField: {fileID: 5158876966542403221, guid: 067524cec93a85c47a97dc45395d529f, type: 3}
+  - <Name>k__BackingField: platform
+    <ID>k__BackingField: 1
+    <OccupiedCells>k__BackingField:
+    - {x: 0, y: 0, z: 0}
+    - {x: 1, y: 0, z: 0}
+    - {x: 2, y: 0, z: 0}
+    - {x: 2, y: 0, z: 1}
+    - {x: 1, y: 0, z: 1}
+    - {x: 0, y: 0, z: 1}
+    - {x: 0, y: 0, z: 2}
+    - {x: 1, y: 0, z: 2}
+    - {x: 2, y: 0, z: 2}
+    <Prefab>k__BackingField: {fileID: 8409257631567611965, guid: eb0bbcd23b5e601468dd0aa1c405575f, type: 3}

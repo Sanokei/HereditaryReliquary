@@ -161,6 +161,15 @@ namespace GridBuilder.Core
             
             Vector3 cellSize = grid != null ? grid.cellSize : Vector3.one;
             
+            // Calculate the center of all occupied cells (in cell space)
+            // This ensures the mesh is centered at the origin, so when positioned it aligns correctly
+            Vector3 cellCenterOffset = Vector3.zero;
+            foreach (var cell in occupiedCells)
+            {
+                cellCenterOffset += new Vector3(cell.x, cell.y, cell.z);
+            }
+            cellCenterOffset /= occupiedCells.Count;
+            
             List<Vector3> vertices = new List<Vector3>();
             List<int> triangles = new List<int>();
             List<Vector2> uvs = new List<Vector2>();
@@ -170,10 +179,11 @@ namespace GridBuilder.Core
             for (int i = 0; i < occupiedCells.Count; i++)
             {
                 Vector3Int cell = occupiedCells[i];
-                Vector3 cellCenter = new Vector3(
-                    cell.x * cellSize.x,
+                // Offset cell position by the center so the mesh is centered at origin
+                Vector3 relativeCellPos = new Vector3(
+                    (cell.x - cellCenterOffset.x) * cellSize.x,
                     0,
-                    cell.z * cellSize.z
+                    (cell.z - cellCenterOffset.z) * cellSize.z
                 );
                 
                 // Quad vertices (slightly above ground to avoid z-fighting)
@@ -184,10 +194,10 @@ namespace GridBuilder.Core
                 int vertexOffset = vertices.Count;
                 
                 // Four corners of the quad in XZ plane (horizontal)
-                vertices.Add(cellCenter + new Vector3(-halfX, yOffset, -halfZ));
-                vertices.Add(cellCenter + new Vector3(halfX, yOffset, -halfZ));
-                vertices.Add(cellCenter + new Vector3(halfX, yOffset, halfZ));
-                vertices.Add(cellCenter + new Vector3(-halfX, yOffset, halfZ));
+                vertices.Add(relativeCellPos + new Vector3(-halfX, yOffset, -halfZ));
+                vertices.Add(relativeCellPos + new Vector3(halfX, yOffset, -halfZ));
+                vertices.Add(relativeCellPos + new Vector3(halfX, yOffset, halfZ));
+                vertices.Add(relativeCellPos + new Vector3(-halfX, yOffset, halfZ));
                 
                 // UVs
                 uvs.Add(new Vector2(0, 0));
