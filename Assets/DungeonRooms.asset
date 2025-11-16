@@ -22,8 +22,7 @@ MonoBehaviour:
     - {x: 0, y: 0, z: 0}
     - {x: 1, y: 0, z: 0}
     <Prefab>k__BackingField: {fileID: 5158876966542403221, guid: 067524cec93a85c47a97dc45395d529f, type: 3}
-    placementValidators:
-    - {fileID: 11400000, guid: 7b705851630ce2548bb1202eddc79594, type: 2}
+    placementValidators: []
   - <Name>k__BackingField: platform
     <ID>k__BackingField: 1
     <OccupiedCells>k__BackingField:
