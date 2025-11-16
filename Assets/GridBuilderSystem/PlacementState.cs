@@ -147,13 +147,10 @@ namespace GridBuilder.Core
             if (splineGridContainers == null || splineGridContainers.Count == 0)
                 return false;
             
-            // Use the first container's grid for coordinate calculations
-            Grid referenceGrid = splineGridContainers[0].Grid;
+            // Use the current container's grid for coordinate calculations (or first if none)
+            Grid referenceGrid = currentContainer != null ? currentContainer.Grid : splineGridContainers[0].Grid;
             if (referenceGrid == null)
                 return false;
-            
-            // Track which containers contain each cell and check for collisions
-            Dictionary<Vector3Int, List<SplineGridContainer>> cellContainers = new Dictionary<Vector3Int, List<SplineGridContainer>>();
             
             // Check all cells the object would occupy
             foreach (var cell in occupiedCells)
@@ -177,21 +174,10 @@ namespace GridBuilder.Core
                     return false;
                 }
                 
-                cellContainers[cellPos] = containingContainers;
-            }
-            
-            // Check for collisions across all relevant containers
-            // We need to check each cell against all containers that contain it
-            foreach (var kvp in cellContainers)
-            {
-                Vector3Int cellPos = kvp.Key;
-                Vector3 worldPos = referenceGrid.GetCellCenterWorld(cellPos);
-                List<SplineGridContainer> containers = kvp.Value;
-                
-                // Check if any of the containers that contain this cell already have an object here
-                foreach (var container in containers)
+                // Check for collisions in each container that contains this cell
+                foreach (var container in containingContainers)
                 {
-                    // Convert to container's grid space
+                    // Convert world position to this container's grid space
                     Vector3Int containerCellPos = container.Grid.WorldToCell(worldPos);
                     if (container.GridData.HasObjectAt(containerCellPos))
                     {
@@ -246,7 +232,8 @@ namespace GridBuilder.Core
             if (splineGridContainers == null || splineGridContainers.Count == 0)
                 return;
             
-            Grid referenceGrid = splineGridContainers[0].Grid;
+            // Use the current container's grid for coordinate calculations (or first if none)
+            Grid referenceGrid = currentContainer != null ? currentContainer.Grid : splineGridContainers[0].Grid;
             if (referenceGrid == null)
                 return;
             
@@ -268,8 +255,15 @@ namespace GridBuilder.Core
                         {
                             containerCells[container] = new List<Vector3Int>();
                         }
-                        // Store the cell relative to gridPosition for this container
-                        containerCells[container].Add(cell);
+                        
+                        // Convert the cell position to this container's grid space
+                        Vector3Int containerCellPos = container.Grid.WorldToCell(worldPos);
+                        // Calculate the relative offset from the container's grid position
+                        Vector3 gridPosWorld = referenceGrid.GetCellCenterWorld(gridPosition);
+                        Vector3Int containerGridPos = container.Grid.WorldToCell(gridPosWorld);
+                        Vector3Int relativeCell = containerCellPos - containerGridPos;
+                        
+                        containerCells[container].Add(relativeCell);
                     }
                 }
             }

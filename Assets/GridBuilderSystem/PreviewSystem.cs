@@ -140,6 +140,11 @@ namespace GridBuilder.Core
             Mesh combinedMesh = GenerateCombinedCellMesh(occupiedCells);
             if (cellIndicatorMeshFilter != null)
             {
+                // Clear old mesh if it exists
+                if (cellIndicatorMeshFilter.sharedMesh != null && cellIndicatorMeshFilter.sharedMesh.name == "CombinedCellIndicator")
+                {
+                    DestroyImmediate(cellIndicatorMeshFilter.sharedMesh);
+                }
                 cellIndicatorMeshFilter.mesh = combinedMesh;
             }
         }
@@ -179,7 +184,6 @@ namespace GridBuilder.Core
                 int vertexOffset = vertices.Count;
                 
                 // Four corners of the quad in XZ plane (horizontal)
-                // The GameObject is rotated 90 degrees on X, so these vertices will be correct
                 vertices.Add(cellCenter + new Vector3(-halfX, yOffset, -halfZ));
                 vertices.Add(cellCenter + new Vector3(halfX, yOffset, -halfZ));
                 vertices.Add(cellCenter + new Vector3(halfX, yOffset, halfZ));
@@ -263,6 +267,9 @@ namespace GridBuilder.Core
 
         private void MoveCursor(Vector3 position)
         {
+            if (cellIndicator == null)
+                return;
+                
             // Position cell indicator at the same position as preview
             // The position passed in already includes offset for centering multi-cell objects
             // Cell indicator has center pivot, so it aligns correctly when positioned at the center
