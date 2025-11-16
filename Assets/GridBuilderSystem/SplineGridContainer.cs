@@ -13,7 +13,7 @@ namespace GridBuilder.Core
     {
         private SplineContainer splineContainer;
         [SerializeField] private Material gridMaterial;
-        [SerializeField] private float gridCellSize = 1f;
+        private float gridCellSize = 1f;
         [SerializeField] private LayerMask placementLayerMask;
         [SerializeField] private ObjectsDatabaseSO objectsDatabase;
         
@@ -186,6 +186,97 @@ namespace GridBuilder.Core
                 }
             }
             return (intersections % 2) == 1;
+        }
+        
+        /// <summary>
+        /// Gets the boundary polygon points in world space (XZ plane)
+        /// </summary>
+        public List<Vector2> GetBoundaryPolygon()
+        {
+            List<Vector2> polygon = new List<Vector2>();
+            if (splineContainer == null || splineContainer.Spline == null)
+                return polygon;
+                
+            var spline = splineContainer.Spline;
+            for (int i = 0; i < spline.Count; i++)
+            {
+                var knot = spline[i];
+                Vector3 worldPos = splineContainer.transform.TransformPoint(knot.Position);
+                polygon.Add(new Vector2(worldPos.x, worldPos.z));
+            }
+            return polygon;
+        }
+        
+        /// <summary>
+        /// Checks if this container's boundary intersects with another container's boundary
+        /// </summary>
+        public bool BoundariesIntersect(SplineGridContainer other)
+        {
+            if (other == null || other == this)
+                return false;
+                
+            List<Vector2> polygon1 = GetBoundaryPolygon();
+            List<Vector2> polygon2 = other.GetBoundaryPolygon();
+            
+            if (polygon1.Count < 3 || polygon2.Count < 3)
+                return false;
+            
+            // Check if any edge of polygon1 intersects with any edge of polygon2
+            for (int i = 0; i < polygon1.Count; i++)
+            {
+                Vector2 p1a = polygon1[i];
+                Vector2 p1b = polygon1[(i + 1) % polygon1.Count];
+                
+                for (int j = 0; j < polygon2.Count; j++)
+                {
+                    Vector2 p2a = polygon2[j];
+                    Vector2 p2b = polygon2[(j + 1) % polygon2.Count];
+                    
+                    if (DoLineSegmentsIntersect(p1a, p1b, p2a, p2b))
+                    {
+                        return true;
+                    }
+                }
+            }
+            
+            // Also check if one polygon is completely inside the other (they intersect)
+            // Check if any vertex of polygon1 is inside polygon2
+            foreach (var vertex in polygon1)
+            {
+                if (IsPointInPolygon(vertex, polygon2))
+                {
+                    return true;
+                }
+            }
+            
+            // Check if any vertex of polygon2 is inside polygon1
+            foreach (var vertex in polygon2)
+            {
+                if (IsPointInPolygon(vertex, polygon1))
+                {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+        
+        /// <summary>
+        /// Checks if two line segments intersect
+        /// </summary>
+        private bool DoLineSegmentsIntersect(Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p4)
+        {
+            float denominator = (p4.y - p3.y) * (p2.x - p1.x) - (p4.x - p3.x) * (p2.y - p1.y);
+            
+            // Lines are parallel
+            if (Mathf.Abs(denominator) < 0.0001f)
+                return false;
+            
+            float ua = ((p4.x - p3.x) * (p1.y - p3.y) - (p4.y - p3.y) * (p1.x - p3.x)) / denominator;
+            float ub = ((p2.x - p1.x) * (p1.y - p3.y) - (p2.y - p1.y) * (p1.x - p3.x)) / denominator;
+            
+            // Check if intersection point is within both line segments
+            return ua >= 0 && ua <= 1 && ub >= 0 && ub <= 1;
         }
         
         /// <summary>

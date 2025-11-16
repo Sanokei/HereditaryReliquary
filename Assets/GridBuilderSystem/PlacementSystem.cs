@@ -10,7 +10,7 @@ namespace GridBuilder.Core
 {
     public class PlacementSystem : MonoBehaviour
     {
-        [SerializeField] List<SplineGridContainer> splineGridContainers = new List<SplineGridContainer>();
+        List<SplineGridContainer> splineGridContainers = new List<SplineGridContainer>();
         
         [SerializeField] List<ObjectsDatabaseSO> databases = new List<ObjectsDatabaseSO>();
 
@@ -38,6 +38,9 @@ namespace GridBuilder.Core
 
         void Awake()
         {
+            // Find all SplineGridContainer components
+            splineGridContainers = FindObjectsByType<SplineGridContainer>(FindObjectsSortMode.None).ToList();
+
             // Hide all grids initially
             foreach (var container in splineGridContainers)
             {

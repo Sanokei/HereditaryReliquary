@@ -141,6 +141,7 @@ namespace GridBuilder.Core
         /// <summary>
         /// Checks if an object can be placed across multiple containers.
         /// Each cell must be within at least one container, and no collisions across all containers.
+        /// Additionally, if an object spans multiple containers, those containers' boundaries must actually intersect.
         /// </summary>
         private bool CanPlaceObjectAcrossContainers(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
         {
@@ -151,6 +152,9 @@ namespace GridBuilder.Core
             Grid referenceGrid = currentContainer != null ? currentContainer.Grid : splineGridContainers[0].Grid;
             if (referenceGrid == null)
                 return false;
+            
+            // Track which containers are involved
+            HashSet<SplineGridContainer> involvedContainers = new HashSet<SplineGridContainer>();
             
             // Check all cells the object would occupy
             foreach (var cell in occupiedCells)
@@ -165,6 +169,7 @@ namespace GridBuilder.Core
                     if (container != null && container.IsPositionWithinBoundary(worldPos))
                     {
                         containingContainers.Add(container);
+                        involvedContainers.Add(container);
                     }
                 }
                 
@@ -182,6 +187,25 @@ namespace GridBuilder.Core
                     if (container.GridData.HasObjectAt(containerCellPos))
                     {
                         return false;
+                    }
+                }
+            }
+            
+            // If the object spans multiple containers, verify their boundaries actually intersect
+            if (involvedContainers.Count > 1)
+            {
+                List<SplineGridContainer> containerList = new List<SplineGridContainer>(involvedContainers);
+                
+                // Check that all involved containers have intersecting boundaries
+                for (int i = 0; i < containerList.Count; i++)
+                {
+                    for (int j = i + 1; j < containerList.Count; j++)
+                    {
+                        if (!containerList[i].BoundariesIntersect(containerList[j]))
+                        {
+                            // Containers are not touching, block placement
+                            return false;
+                        }
                     }
                 }
             }
