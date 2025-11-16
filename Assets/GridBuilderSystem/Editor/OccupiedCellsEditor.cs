@@ -336,21 +336,41 @@ namespace GridBuilder.Core
         
         private void CalculatePrefabBounds()
         {
-            // Get all mesh renderers in the hierarchy
-            MeshRenderer[] renderers = previewInstance.GetComponentsInChildren<MeshRenderer>();
+            // Get all mesh filters in the hierarchy
+            MeshFilter[] meshFilters = previewInstance.GetComponentsInChildren<MeshFilter>();
             
-            if (renderers.Length == 0)
+            if (meshFilters.Length == 0)
             {
-                // Throw error for not having renderers
-                Debug.LogError($"{objectData.Prefab.name} has no mesh renderers found in the prefab hierarchy");
+                // Throw error for not having mesh filters
+                Debug.LogError($"{objectData.Prefab.name} has no mesh filters found in the prefab hierarchy");
                 return;
             }
             
-            // Calculate combined bounds
-            prefabBounds = renderers[0].bounds; 
-            for (int i = 1; i < renderers.Length; i++)
+            // Calculate combined bounds from mesh filters
+            bool boundsInitialized = false;
+            foreach (MeshFilter meshFilter in meshFilters)
             {
-                prefabBounds.Encapsulate(renderers[i].bounds);
+                if (meshFilter.sharedMesh != null)
+                {
+                    Bounds meshBounds = meshFilter.sharedMesh.bounds;
+                    Bounds worldBounds = new Bounds(
+                        meshFilter.transform.TransformPoint(meshBounds.center),
+                        meshBounds.size
+                    );
+                    
+                    // Scale the bounds size by the transform's scale
+                    worldBounds.size = Vector3.Scale(worldBounds.size, meshFilter.transform.lossyScale);
+                    
+                    if (!boundsInitialized)
+                    {
+                        prefabBounds = worldBounds;
+                        boundsInitialized = true;
+                    }
+                    else
+                    {
+                        prefabBounds.Encapsulate(worldBounds);
+                    }
+                }
             }
         }
         
