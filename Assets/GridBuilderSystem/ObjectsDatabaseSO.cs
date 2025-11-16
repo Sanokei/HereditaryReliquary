@@ -9,6 +9,7 @@ namespace GridBuilder.Core
     public class ObjectsDatabaseSO : ScriptableObject
     {
         public LayerMask placementLayermask;
+        public int cellSize = 1;
         public List<ObjectData> objectsData;
     }
 

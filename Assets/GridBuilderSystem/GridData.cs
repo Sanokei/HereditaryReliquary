@@ -265,6 +265,27 @@ namespace GridBuilder.Core
             }
             return new List<int>(uniqueIDs);
         }
+        
+        /// <summary>
+        /// Gets all unique PlacementData objects in the grid
+        /// </summary>
+        public List<PlacementData> GetAllPlacementData()
+        {
+            HashSet<int> seenIndices = new HashSet<int>();
+            List<PlacementData> result = new List<PlacementData>();
+            
+            foreach (var kvp in placedObjects)
+            {
+                PlacementData data = kvp.Value;
+                if (!seenIndices.Contains(data.PlacedObjectIndex))
+                {
+                    seenIndices.Add(data.PlacedObjectIndex);
+                    result.Add(data);
+                }
+            }
+            
+            return result;
+        }
     }
 
     public class PlacementData

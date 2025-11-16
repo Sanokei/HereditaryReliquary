@@ -25,6 +25,8 @@ namespace GridBuilder.Core
 
         private List<SplineGridContainer> splineGridContainers;
         private SplineGridContainer currentContainer;
+        private SplineGridContainer previousContainer;
+        private Grid previousGrid;
         private float currentRotation = 0f;
         private PreviewSystem previewSystemRef;
 
@@ -46,15 +48,31 @@ namespace GridBuilder.Core
             this.soundFeedback = soundFeedback;
             this.splineGridContainers = splineGridContainers;
             this.currentContainer = splineGridContainers != null && splineGridContainers.Count > 0 ? splineGridContainers[0] : null;
+            this.previousContainer = null;
+            this.previousGrid = null;
             this.previewSystemRef = previewSystem;
 
             selectedObjectIndex = database.objectsData.FindIndex(data => data.ID == ID);
             if (selectedObjectIndex > -1)
             {
+                // Convert occupied cells from database cell size to container cell size for preview
+                List<Vector3Int> databaseOccupiedCells = database.objectsData[selectedObjectIndex].OccupiedCells;
+                int databaseCellSize = database.cellSize;
+                int containerCellSize = currentContainer != null ? currentContainer.GridCellSize : 1;
+                List<Vector3Int> convertedOccupiedCells = CellSizeConverter.ConvertOccupiedCells(
+                    databaseOccupiedCells,
+                    databaseCellSize,
+                    containerCellSize
+                );
+                
                 previewSystem.StartShowingPlacementPreview(
                     database.objectsData[selectedObjectIndex].Prefab,
-                    database.objectsData[selectedObjectIndex].OccupiedCells,
+                    convertedOccupiedCells,
                     grid);
+                
+                // Initialize previous references after first preview creation
+                previousContainer = currentContainer;
+                previousGrid = grid;
             }
             else
                 throw new System.Exception($"No object with ID {iD}");
@@ -92,7 +110,7 @@ namespace GridBuilder.Core
             int index = objectPlacer.PlaceObject(database.objectsData[selectedObjectIndex].Prefab,
                 placementPosition, rotation);
 
-            // Get rotated occupied cells
+            // Get rotated occupied cells (already converted to container cell size in CheckPlacementValidity)
             List<Vector3Int> rotatedCells = RotateOccupiedCells(geometry.OccupiedCells, currentRotation);
             
             // Add object to all containers that contain parts of it
@@ -116,7 +134,18 @@ namespace GridBuilder.Core
 
         private bool CheckPlacementValidity(Vector3Int gridPosition, int selectedObjectIndex, out PlacementGeometry geometry)
         {
-            List<Vector3Int> occupiedCells = database.objectsData[selectedObjectIndex].OccupiedCells;
+            // Get occupied cells from database (in database cell size space)
+            List<Vector3Int> databaseOccupiedCells = database.objectsData[selectedObjectIndex].OccupiedCells;
+            
+            // Convert from database cell size to container cell size
+            int databaseCellSize = database.cellSize;
+            int containerCellSize = currentContainer != null ? currentContainer.GridCellSize : 1;
+            List<Vector3Int> occupiedCells = CellSizeConverter.ConvertOccupiedCells(
+                databaseOccupiedCells, 
+                databaseCellSize, 
+                containerCellSize
+            );
+            
             geometry = CalculatePlacementGeometry(gridPosition, occupiedCells);
             
             // Get rotated cells for validity check
@@ -269,6 +298,36 @@ namespace GridBuilder.Core
             {
                 grid = currentContainer.Grid;
                 gridData = currentContainer.GridData;
+                
+                // Only recreate preview if container or grid actually changed
+                bool containerChanged = currentContainer != previousContainer;
+                bool gridChanged = grid != previousGrid;
+                
+                if (containerChanged || gridChanged)
+                {
+                    // Update preview with converted cells if container/grid changed
+                    if (selectedObjectIndex >= 0 && selectedObjectIndex < database.objectsData.Count)
+                    {
+                        List<Vector3Int> databaseOccupiedCells = database.objectsData[selectedObjectIndex].OccupiedCells;
+                        int databaseCellSize = database.cellSize;
+                        int containerCellSize = currentContainer.GridCellSize;
+                        List<Vector3Int> convertedOccupiedCells = CellSizeConverter.ConvertOccupiedCells(
+                            databaseOccupiedCells,
+                            databaseCellSize,
+                            containerCellSize
+                        );
+                        
+                        // Update preview system with new grid and converted cells
+                        previewSystem.StartShowingPlacementPreview(
+                            database.objectsData[selectedObjectIndex].Prefab,
+                            convertedOccupiedCells,
+                            grid);
+                        previewSystem.SetRotation(currentRotation);
+                    }
+                    
+                    previousContainer = currentContainer;
+                    previousGrid = grid;
+                }
             }
             
             PlacementGeometry geometry;

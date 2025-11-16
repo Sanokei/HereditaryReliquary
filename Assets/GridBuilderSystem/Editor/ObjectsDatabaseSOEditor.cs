@@ -33,6 +33,13 @@ namespace GridBuilder.Core
                 EditorGUILayout.PropertyField(placementLayerMaskProp);
             }
             
+            // Draw cell size
+            SerializedProperty cellSizeProp = serializedObject.FindProperty("cellSize");
+            if (cellSizeProp != null)
+            {
+                EditorGUILayout.PropertyField(cellSizeProp, new GUIContent("Cell Size", "The cell size for objects in this database. Objects defined with this cell size will be converted to match container cell sizes when placed."));
+            }
+            
             EditorGUILayout.Space();
             
             // Draw objects data list

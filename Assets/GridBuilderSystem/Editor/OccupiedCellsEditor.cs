@@ -50,7 +50,7 @@ namespace GridBuilder.Core
         {
             objectData = data;
             parentDatabase = database;
-            cellSize = 1f; // Default cell size, matches grid cell size
+            cellSize = database != null ? database.cellSize : 1f; // Use database cell size
             
             // Load existing occupied cells
             occupiedCells.Clear();

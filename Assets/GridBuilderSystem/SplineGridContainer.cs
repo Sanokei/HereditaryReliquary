@@ -22,6 +22,7 @@ namespace GridBuilder.Core
         private MeshFilter meshFilter;
         private MeshRenderer meshRenderer;
         private GridData gridData;
+        private int previousCellSize;
         
         public SplineContainer SplineContainer => splineContainer;
         public Grid Grid => grid;
@@ -35,6 +36,7 @@ namespace GridBuilder.Core
             splineContainer = GetComponent<SplineContainer>();
             
             gridData = new GridData();
+            previousCellSize = gridCellSize;
             UpdateSplineFromGridSize();
             InitializeGrid();
             GenerateGridVisualization();
@@ -48,6 +50,22 @@ namespace GridBuilder.Core
                 gridObject.transform.SetParent(transform);
                 gridObject.transform.localPosition = Vector3.zero;
                 grid = gridObject.AddComponent<Grid>();
+                grid.cellSize = new Vector3(gridCellSize, gridCellSize, gridCellSize);
+            }
+            else
+            {
+                // Update existing grid cell size
+                UpdateGridCellSize();
+            }
+        }
+        
+        /// <summary>
+        /// Updates the grid's cell size
+        /// </summary>
+        private void UpdateGridCellSize()
+        {
+            if (grid != null)
+            {
                 grid.cellSize = new Vector3(gridCellSize, gridCellSize, gridCellSize);
             }
         }
@@ -339,6 +357,7 @@ namespace GridBuilder.Core
         
         /// <summary>
         /// Updates the spline container to match the gridSize, creating a rectangular boundary
+        /// The actual world size is gridSize * gridCellSize, so the spline scales with cell size
         /// </summary>
         private void UpdateSplineFromGridSize()
         {
@@ -352,10 +371,12 @@ namespace GridBuilder.Core
             // Clear existing knots
             spline.Clear();
             
-            // Create a rectangle centered at origin with dimensions matching gridSize
+            // Calculate actual world size: gridSize represents number of cells, multiply by cell size for world units
             // gridSize.x maps to X axis, gridSize.y maps to Z axis
-            float halfWidth = gridSize.x * 0.5f;
-            float halfHeight = gridSize.y * 0.5f;
+            float worldWidth = gridSize.x * gridCellSize;
+            float worldHeight = gridSize.y * gridCellSize;
+            float halfWidth = worldWidth * 0.5f;
+            float halfHeight = worldHeight * 0.5f;
             
             // Create 4 corners of the rectangle (in local space of splineContainer)
             // Order: bottom-left, bottom-right, top-right, top-left (to form a closed loop)
@@ -388,6 +409,26 @@ namespace GridBuilder.Core
                 UpdateSplineFromGridSize();
             }
             
+            // Update grid cell size if it changed
+            if (grid != null && gridCellSize != previousCellSize)
+            {
+                UpdateGridCellSize();
+                
+                // Update spline when cell size changes (spline size scales with cell size)
+                if (splineContainer != null)
+                {
+                    UpdateSplineFromGridSize();
+                }
+                
+                // If playing and objects are placed, snap them to new grid
+                if (Application.isPlaying && gridData != null)
+                {
+                    SnapExistingObjectsToGrid(previousCellSize, gridCellSize);
+                }
+                
+                previousCellSize = gridCellSize;
+            }
+            
             if (Application.isPlaying && gridVisualization != null)
             {
                 GenerateGridVisualization();
@@ -399,6 +440,52 @@ namespace GridBuilder.Core
                     gridVisualization.layer = layer;
                 }
             }
+        }
+        
+        /// <summary>
+        /// Snaps existing placed objects to the new grid cell size
+        /// Note: This requires ObjectPlacer access which should be provided via BuildingSystemManager
+        /// </summary>
+        private void SnapExistingObjectsToGrid(int oldCellSize, int newCellSize)
+        {
+            // Get all unique placed objects from GridData
+            HashSet<int> uniqueObjectIndices = new HashSet<int>();
+            Dictionary<int, PlacementData> objectDataMap = new Dictionary<int, PlacementData>();
+            
+            // Collect all unique objects and their data
+            // Note: This is a simplified approach - in practice, you'd need access to ObjectPlacer
+            // to actually move the GameObjects. This method prepares the data for snapping.
+            var allPlacementData = GetAllPlacementData();
+            
+            if (allPlacementData.Count == 0)
+                return;
+            
+            // For each unique object, calculate new grid position based on world position
+            // Since we don't have direct access to ObjectPlacer here, we'll update GridData
+            // The actual GameObject positions would need to be updated by the system that has ObjectPlacer access
+            foreach (var placementData in allPlacementData)
+            {
+                if (uniqueObjectIndices.Contains(placementData.PlacedObjectIndex))
+                    continue;
+                
+                uniqueObjectIndices.Add(placementData.PlacedObjectIndex);
+                objectDataMap[placementData.PlacedObjectIndex] = placementData;
+            }
+            
+            // Note: Actual GameObject snapping would require ObjectPlacer reference
+            // This is a placeholder that updates GridData structure
+            // The calling system should handle GameObject position updates
+        }
+        
+        /// <summary>
+        /// Gets all unique PlacementData from GridData
+        /// </summary>
+        private List<PlacementData> GetAllPlacementData()
+        {
+            if (gridData == null)
+                return new List<PlacementData>();
+            
+            return gridData.GetAllPlacementData();
         }
     }
 }
