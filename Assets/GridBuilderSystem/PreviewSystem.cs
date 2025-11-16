@@ -94,36 +94,56 @@ namespace GridBuilder.Core
             if (rotationSteps == 0)
                 return new List<Vector3Int>(cells);
             
-            // Calculate center of occupied cells
-            Vector3 center = Vector3.zero;
+            if (cells == null || cells.Count == 0)
+                return new List<Vector3Int>(cells);
+            
+            // Find bounding box to calculate center
+            int minX = int.MaxValue, minY = int.MaxValue, minZ = int.MaxValue;
+            int maxX = int.MinValue, maxY = int.MinValue, maxZ = int.MinValue;
+            
             foreach (var cell in cells)
             {
-                center += new Vector3(cell.x, cell.y, cell.z);
+                minX = Mathf.Min(minX, cell.x);
+                minY = Mathf.Min(minY, cell.y);
+                minZ = Mathf.Min(minZ, cell.z);
+                maxX = Mathf.Max(maxX, cell.x);
+                maxY = Mathf.Max(maxY, cell.y);
+                maxZ = Mathf.Max(maxZ, cell.z);
             }
-            center /= cells.Count;
+            
+            // Calculate center of bounding box (as float for accuracy)
+            // Then round to nearest integer to use as pivot point
+            float centerX = (minX + maxX) * 0.5f;
+            float centerY = (minY + maxY) * 0.5f;
+            float centerZ = (minZ + maxZ) * 0.5f;
+            
+            Vector3Int pivot = new Vector3Int(
+                Mathf.RoundToInt(centerX),
+                Mathf.RoundToInt(centerY),
+                Mathf.RoundToInt(centerZ)
+            );
             
             List<Vector3Int> rotatedCells = new List<Vector3Int>();
             
             foreach (var cell in cells)
             {
-                // Translate to origin
-                Vector3 relative = new Vector3(cell.x, cell.y, cell.z) - center;
+                // Translate to origin relative to pivot
+                Vector3Int relative = cell - pivot;
                 
-                // Apply 90-degree rotations
+                // Apply 90-degree rotations counter-clockwise: (x, z) -> (-z, x)
+                int rotatedX = relative.x;
+                int rotatedZ = relative.z;
+                
                 for (int i = 0; i < rotationSteps; i++)
                 {
-                    float temp = relative.x;
-                    relative.x = -relative.z;
-                    relative.z = temp;
+                    int temp = rotatedX;
+                    rotatedX = -rotatedZ;
+                    rotatedZ = temp;
                 }
                 
-                // Translate back and round to int
-                Vector3 rotated = relative + center;
-                rotatedCells.Add(new Vector3Int(
-                    Mathf.RoundToInt(rotated.x),
-                    Mathf.RoundToInt(rotated.y),
-                    Mathf.RoundToInt(rotated.z)
-                ));
+                // Translate back relative to pivot
+                Vector3Int rotated = new Vector3Int(rotatedX, relative.y, rotatedZ) + pivot;
+                rotatedCells.Add(rotated);
             }
             
             return rotatedCells;
