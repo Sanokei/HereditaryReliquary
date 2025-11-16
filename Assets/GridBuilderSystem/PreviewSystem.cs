@@ -5,11 +5,12 @@ namespace GridBuilder.Core
 {
     public class PreviewSystem : MonoBehaviour
     {
-        [SerializeField]
-        private float previewYOffset = 0.00f;
-
-        [SerializeField]
-        private Material previewMaterialPrefab;
+        [SerializeField] private float previewYOffset = 0.00f;
+        [SerializeField, Range(0f, 1f)] private float previewOpacity = 0.2f;
+        [SerializeField] private Color previewColor = new Color(1f, 1f, 1f);
+        [SerializeField] private Color invalidPreviewColor = new Color(1f, 0f, 0f);
+        [SerializeField] private Color validCellIndicatorColor = new Color(0f, 1f, 0f);
+        [SerializeField] private Color invalidCellIndicatorColor = new Color(1f, 0f, 0f);
         private Material previewMaterialInstance;
 
         private GameObject cellIndicator;
@@ -22,7 +23,16 @@ namespace GridBuilder.Core
 
         private void Awake()
         {
-            previewMaterialInstance = new Material(previewMaterialPrefab);
+            previewMaterialInstance = new Material(Shader.Find("Sprites/Default"));
+            previewMaterialInstance.color = new Color(previewColor.r, previewColor.g, previewColor.b, previewOpacity);
+            previewMaterialInstance.SetFloat("_Mode", 0);
+            previewMaterialInstance.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            previewMaterialInstance.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            previewMaterialInstance.SetInt("_ZWrite", 0);
+            previewMaterialInstance.DisableKeyword("_ALPHATEST_ON");
+            previewMaterialInstance.EnableKeyword("_ALPHABLEND_ON");
+            previewMaterialInstance.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            previewMaterialInstance.renderQueue = 3000;
             CreateCellIndicator();
         }
         
@@ -41,7 +51,7 @@ namespace GridBuilder.Core
             
             // Create a material for the cell indicator
             Material cellMaterial = new Material(Shader.Find("Sprites/Default"));
-            cellMaterial.color = new Color(0f, 1f, 0f, 0.5f);
+            cellMaterial.color = new Color(validCellIndicatorColor.r, validCellIndicatorColor.g, validCellIndicatorColor.b);
             meshRenderer.material = cellMaterial;
             cellIndicatorRenderer = meshRenderer;
             
@@ -281,17 +291,15 @@ namespace GridBuilder.Core
 
         private void ApplyFeedbackToPreview(bool validity)
         {
-            Color c = validity ? Color.white : Color.red;
+            Color c = validity ? previewColor : invalidPreviewColor;
 
-            c.a = 0.5f;
+            c.a = previewOpacity;
             previewMaterialInstance.color = c;
         }
 
         private void ApplyFeedbackToCursor(bool validity)
         {
-            Color c = validity ? Color.green : Color.red;
-
-            c.a = 0.5f;
+            Color c = validity ? validCellIndicatorColor : invalidCellIndicatorColor;
             cellIndicatorRenderer.sharedMaterial.color = c;
         }
 

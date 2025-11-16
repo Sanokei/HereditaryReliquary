@@ -754,7 +754,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.PreviewSystem
   previewYOffset: 0
-  previewMaterialPrefab: {fileID: 2100000, guid: 3e04babce0067c14d97641d7834790f1, type: 2}
+  previewOpacity: 0.2
+  previewColor: {r: 1, g: 1, b: 1, a: 1}
+  invalidPreviewColor: {r: 1, g: 0.18564281, b: 0, a: 1}
+  validCellIndicatorColor: {r: 0, g: 1, b: 0, a: 1}
+  invalidCellIndicatorColor: {r: 1, g: 0.18422438, b: 0, a: 1}
 --- !u!4 &1307109930
 Transform:
   m_ObjectHideFlags: 0
@@ -954,7 +958,7 @@ Transform:
   m_GameObject: {fileID: 1448516281}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 10.1}
+  m_LocalPosition: {x: 0, y: 0, z: 10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
