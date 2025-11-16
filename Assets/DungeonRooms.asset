@@ -16,7 +16,9 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   objectsData:
-  - <Name>k__BackingField: Cube
+  - <Name>k__BackingField: w
     <ID>k__BackingField: 0
-    <Size>k__BackingField: {x: 1, y: 1, z: 2}
+    <OccupiedCells>k__BackingField:
+    - {x: 0, y: 0, z: 0}
+    - {x: 1, y: 0, z: 0}
     <Prefab>k__BackingField: {fileID: 6653896684479306613, guid: 067524cec93a85c47a97dc45395d529f, type: 3}

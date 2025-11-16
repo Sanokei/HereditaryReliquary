@@ -36,7 +36,7 @@ namespace GridBuilder.Core
         public void OnAction(Vector3Int gridPosition)
         {
             GridData selectedData = null;
-            if (!gridData.CanPlaceObejctAt(gridPosition, Vector3Int.one))
+            if (!gridData.CanPlaceObejctAt(gridPosition, new List<Vector3Int> { Vector3Int.zero }))
             {
                 selectedData = gridData;
             }
@@ -61,7 +61,7 @@ namespace GridBuilder.Core
 
         private bool CheckIfSelectionIsValid(Vector3Int gridPosition)
         {
-            return gridData.CanPlaceObejctAt(gridPosition, Vector3Int.one);
+            return gridData.CanPlaceObejctAt(gridPosition, new List<Vector3Int> { Vector3Int.zero });
         }
 
         public void UpdateState(Vector3Int gridPosition)

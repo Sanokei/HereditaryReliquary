@@ -191,31 +191,25 @@ namespace GridBuilder.Core
         /// <summary>
         /// Checks if all grid positions for an object are within the boundary
         /// </summary>
-        public bool CanPlaceObjectAt(Vector3Int gridPosition, Vector3Int objectSize)
+        public bool CanPlaceObjectAt(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
         {
             if (grid == null)
                 return false;
                 
             // Check all cells the object would occupy
-            for (int x = 0; x < objectSize.x; x++)
+            foreach (var cell in occupiedCells)
             {
-                for (int y = 0; y < objectSize.y; y++)
+                Vector3Int cellPos = gridPosition + cell;
+                Vector3 worldPos = grid.GetCellCenterWorld(cellPos);
+                
+                if (!IsPositionWithinBoundary(worldPos))
                 {
-                    for (int z = 0; z < objectSize.z; z++)
-                    {
-                        Vector3Int cellPos = gridPosition + new Vector3Int(x, y, z);
-                        Vector3 worldPos = grid.GetCellCenterWorld(cellPos);
-                        
-                        if (!IsPositionWithinBoundary(worldPos))
-                        {
-                            return false;
-                        }
-                    }
+                    return false;
                 }
             }
             
             // Also check grid data for collisions
-            return gridData.CanPlaceObejctAt(gridPosition, objectSize);
+            return gridData.CanPlaceObejctAt(gridPosition, occupiedCells);
         }
         
         public void ShowGrid()

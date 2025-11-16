@@ -20,7 +20,7 @@ namespace GridBuilder.Core
         [field: SerializeField]
         public int ID { get; private set; }
         [field: SerializeField]
-        public Vector3Int Size { get; private set; } = Vector3Int.one;
+        public List<Vector3Int> OccupiedCells { get; private set; } = new List<Vector3Int> { Vector3Int.zero };
         [field: SerializeField]
         public GameObject Prefab { get; private set; }
     }

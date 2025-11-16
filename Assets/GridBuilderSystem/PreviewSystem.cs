@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace GridBuilder.Core
@@ -8,43 +9,59 @@ namespace GridBuilder.Core
         private float previewYOffset = 0.00f;
 
         [SerializeField]
-        private GameObject cellIndicator;
-        private GameObject previewObject;
-
-        [SerializeField]
         private Material previewMaterialPrefab;
         private Material previewMaterialInstance;
 
+        private GameObject cellIndicator;
+        private GameObject previewObject;
         private Renderer cellIndicatorRenderer;
-        private Vector3Int currentObjectSize = Vector3Int.one;
+        private List<Vector3Int> currentOccupiedCells = new List<Vector3Int> { Vector3Int.zero };
         private Grid grid;
         private float currentRotation = 0f;
+        private MeshFilter cellIndicatorMeshFilter;
 
         private void Awake()
         {
             previewMaterialInstance = new Material(previewMaterialPrefab);
+            CreateCellIndicator();
+        }
+        
+        private void CreateCellIndicator()
+        {
+            if (cellIndicator != null)
+                Destroy(cellIndicator);
+                
+            cellIndicator = new GameObject("CellIndicator");
+            cellIndicator.transform.SetParent(transform);
+            cellIndicator.transform.localPosition = Vector3.zero;
+            cellIndicator.transform.localRotation = Quaternion.Euler(0f, 0f, 0f);
+            
+            cellIndicatorMeshFilter = cellIndicator.AddComponent<MeshFilter>();
+            MeshRenderer meshRenderer = cellIndicator.AddComponent<MeshRenderer>();
+            
+            // Create a material for the cell indicator
+            Material cellMaterial = new Material(Shader.Find("Sprites/Default"));
+            cellMaterial.color = new Color(0f, 1f, 0f, 0.5f);
+            meshRenderer.material = cellMaterial;
+            cellIndicatorRenderer = meshRenderer;
+            
             cellIndicator.SetActive(false);
-            cellIndicatorRenderer = cellIndicator.GetComponentInChildren<Renderer>();
         }
 
-        public void StartShowingPlacementPreview(GameObject prefab, Vector3Int size, Grid grid)
+        public void StartShowingPlacementPreview(GameObject prefab, List<Vector3Int> occupiedCells, Grid grid)
         {
             this.grid = grid;
-            currentObjectSize = size;
+            currentOccupiedCells = new List<Vector3Int>(occupiedCells);
             currentRotation = 0f;
             previewObject = Instantiate(prefab);
             PreparePreview(previewObject);
-            PrepareCursor(size);
+            PrepareCursor(occupiedCells);
             
             // Reset rotation for both preview and cell indicator
             Quaternion identityRotation = Quaternion.identity;
             if (previewObject != null)
             {
                 previewObject.transform.rotation = identityRotation;
-            }
-            if (cellIndicator != null)
-            {
-                cellIndicator.transform.localScale = new Vector3(size.x, size.z, 1);
             }
             
             cellIndicator.SetActive(true);
@@ -60,11 +77,56 @@ namespace GridBuilder.Core
                 previewObject.transform.rotation = rotation;
             }
             
-            // Also rotate the cell indicator
-            if (cellIndicator != null)
+            // Regenerate cell indicator mesh with rotated cells
+            if (cellIndicator != null && currentOccupiedCells != null)
             {
-                // TODO
+                List<Vector3Int> rotatedCells = RotateOccupiedCells(currentOccupiedCells, currentRotation);
+                PrepareCursor(rotatedCells);
             }
+        }
+        
+        private List<Vector3Int> RotateOccupiedCells(List<Vector3Int> cells, float yRotation)
+        {
+            // Normalize rotation to 0, 90, 180, 270 degrees
+            int rotationSteps = Mathf.RoundToInt(yRotation / 90f) % 4;
+            if (rotationSteps < 0) rotationSteps += 4;
+            
+            if (rotationSteps == 0)
+                return new List<Vector3Int>(cells);
+            
+            // Calculate center of occupied cells
+            Vector3 center = Vector3.zero;
+            foreach (var cell in cells)
+            {
+                center += new Vector3(cell.x, cell.y, cell.z);
+            }
+            center /= cells.Count;
+            
+            List<Vector3Int> rotatedCells = new List<Vector3Int>();
+            
+            foreach (var cell in cells)
+            {
+                // Translate to origin
+                Vector3 relative = new Vector3(cell.x, cell.y, cell.z) - center;
+                
+                // Apply 90-degree rotations
+                for (int i = 0; i < rotationSteps; i++)
+                {
+                    float temp = relative.x;
+                    relative.x = -relative.z;
+                    relative.z = temp;
+                }
+                
+                // Translate back and round to int
+                Vector3 rotated = relative + center;
+                rotatedCells.Add(new Vector3Int(
+                    Mathf.RoundToInt(rotated.x),
+                    Mathf.RoundToInt(rotated.y),
+                    Mathf.RoundToInt(rotated.z)
+                ));
+            }
+            
+            return rotatedCells;
         }
         
         public float GetRotation()
@@ -72,15 +134,80 @@ namespace GridBuilder.Core
             return currentRotation;
         }
 
-        private void PrepareCursor(Vector3Int size)
+        private void PrepareCursor(List<Vector3Int> occupiedCells)
         {
-            if (size.x > 0 || size.y > 0 || size.z > 0)
+            // Generate a combined mesh from all occupied cells
+            Mesh combinedMesh = GenerateCombinedCellMesh(occupiedCells);
+            if (cellIndicatorMeshFilter != null)
             {
-                // Cell indicator is a flat plane on the ground, so only scale X and Z (keep Y at 1)
-                // Because it is a quad it uses X and Y instead of Z
-                cellIndicator.transform.localScale = new Vector3(size.x, size.z, 1);
-                cellIndicatorRenderer.sharedMaterial.mainTextureScale = new Vector2(size.x, size.z);
+                cellIndicatorMeshFilter.mesh = combinedMesh;
             }
+        }
+        
+        private Mesh GenerateCombinedCellMesh(List<Vector3Int> occupiedCells)
+        {
+            Mesh mesh = new Mesh();
+            mesh.name = "CombinedCellIndicator";
+            
+            if (occupiedCells == null || occupiedCells.Count == 0)
+            {
+                return mesh;
+            }
+            
+            Vector3 cellSize = grid != null ? grid.cellSize : Vector3.one;
+            
+            List<Vector3> vertices = new List<Vector3>();
+            List<int> triangles = new List<int>();
+            List<Vector2> uvs = new List<Vector2>();
+            
+            // Create a quad for each occupied cell
+            // Quads are created in the XZ plane (horizontal, facing up)
+            for (int i = 0; i < occupiedCells.Count; i++)
+            {
+                Vector3Int cell = occupiedCells[i];
+                Vector3 cellCenter = new Vector3(
+                    cell.x * cellSize.x,
+                    0,
+                    cell.z * cellSize.z
+                );
+                
+                // Quad vertices (slightly above ground to avoid z-fighting)
+                float yOffset = 0.02f;
+                float halfX = cellSize.x * 0.5f;
+                float halfZ = cellSize.z * 0.5f;
+                
+                int vertexOffset = vertices.Count;
+                
+                // Four corners of the quad in XZ plane (horizontal)
+                // The GameObject is rotated 90 degrees on X, so these vertices will be correct
+                vertices.Add(cellCenter + new Vector3(-halfX, yOffset, -halfZ));
+                vertices.Add(cellCenter + new Vector3(halfX, yOffset, -halfZ));
+                vertices.Add(cellCenter + new Vector3(halfX, yOffset, halfZ));
+                vertices.Add(cellCenter + new Vector3(-halfX, yOffset, halfZ));
+                
+                // UVs
+                uvs.Add(new Vector2(0, 0));
+                uvs.Add(new Vector2(1, 0));
+                uvs.Add(new Vector2(1, 1));
+                uvs.Add(new Vector2(0, 1));
+                
+                // Triangles (two triangles per quad)
+                triangles.Add(vertexOffset + 0);
+                triangles.Add(vertexOffset + 2);
+                triangles.Add(vertexOffset + 1);
+                
+                triangles.Add(vertexOffset + 0);
+                triangles.Add(vertexOffset + 3);
+                triangles.Add(vertexOffset + 2);
+            }
+            
+            mesh.vertices = vertices.ToArray();
+            mesh.triangles = triangles.ToArray();
+            mesh.uv = uvs.ToArray();
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            
+            return mesh;
         }
 
         private void PreparePreview(GameObject previewObject)
@@ -148,28 +275,20 @@ namespace GridBuilder.Core
 
         private void MovePreview(Vector3 position)
         {
-            // Preview object pivot is likely at the corner, while cell indicator pivot is at center
-            // For multi-cell objects, we need to adjust the preview position to align with grid cells
-            // The position passed in is centered for the cell indicator (center pivot)
-            // For preview object with corner pivot, we need to offset back by half the object size
-            Vector3 cellSize = grid != null ? grid.cellSize : Vector3.one;
-            Vector3 pivotOffset = new Vector3(
-                -(currentObjectSize.x - 1) * cellSize.x * 0.5f,
-                -(currentObjectSize.y - 1) * cellSize.y * 0.5f,
-                -(currentObjectSize.z - 1) * cellSize.z * 0.5f);
-            
+            // Preview object pivot should align with grid position
+            // The position passed in is the grid cell center
             previewObject.transform.position = new Vector3(
-                position.x + pivotOffset.x,
-                position.y + previewYOffset + pivotOffset.y,
-                position.z + pivotOffset.z);
+                position.x,
+                position.y + previewYOffset,
+                position.z);
         }
 
         internal void StartShowingRemovePreview(Grid grid)
         {
             this.grid = grid;
-            currentObjectSize = Vector3Int.one;
+            currentOccupiedCells = new List<Vector3Int> { Vector3Int.zero };
             cellIndicator.SetActive(true);
-            PrepareCursor(Vector3Int.one);
+            PrepareCursor(currentOccupiedCells);
             ApplyFeedbackToCursor(false);
         }
     }

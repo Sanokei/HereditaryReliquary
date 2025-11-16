@@ -20,11 +20,11 @@ namespace GridBuilder.Core
         }
 
         public void AddObjectAt(Vector3Int gridPosition,
-                                Vector3Int objectSize,
+                                List<Vector3Int> occupiedCells,
                                 int ID,
                                 int placedObjectIndex)
         {
-            List<Vector3Int> positionToOccupy = CalculatePositions(gridPosition, objectSize);
+            List<Vector3Int> positionToOccupy = CalculatePositions(gridPosition, occupiedCells);
             PlacementData data = new PlacementData(positionToOccupy, ID, placedObjectIndex);
             foreach (var pos in positionToOccupy)
             {
@@ -34,25 +34,19 @@ namespace GridBuilder.Core
             }
         }
 
-        private List<Vector3Int> CalculatePositions(Vector3Int gridPosition, Vector3Int objectSize)
+        private List<Vector3Int> CalculatePositions(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
         {
             List<Vector3Int> returnVal = new();
-            for (int x = 0; x < objectSize.x; x++)
+            foreach (var cell in occupiedCells)
             {
-                for (int y = 0; y < objectSize.y; y++)
-                {
-                    for (int z = 0; z < objectSize.z; z++)
-                    {
-                        returnVal.Add(gridPosition + new Vector3Int(x, y, z));
-                    }
-                }
+                returnVal.Add(gridPosition + cell);
             }
             return returnVal;
         }
 
-        public bool CanPlaceObejctAt(Vector3Int gridPosition, Vector3Int objectSize)
+        public bool CanPlaceObejctAt(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
         {
-            List<Vector3Int> positionToOccupy = CalculatePositions(gridPosition, objectSize);
+            List<Vector3Int> positionToOccupy = CalculatePositions(gridPosition, occupiedCells);
             
             // Check if any positions are already occupied
             foreach (var pos in positionToOccupy)
@@ -63,13 +57,13 @@ namespace GridBuilder.Core
             return true;
         }
 
-        public bool IsWithinGridBounds(Vector3Int gridPosition, Vector3Int objectSize)
+        public bool IsWithinGridBounds(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
         {
             // If grid properties are not set, assume unbounded grid
             if (!gridSize.HasValue || !anchorPoint.HasValue)
                 return true;
 
-            List<Vector3Int> positionToOccupy = CalculatePositions(gridPosition, objectSize);
+            List<Vector3Int> positionToOccupy = CalculatePositions(gridPosition, occupiedCells);
             Vector3 gridSizeValue = gridSize.Value;
             Vector3 anchorPointValue = anchorPoint.Value;
 
@@ -99,9 +93,9 @@ namespace GridBuilder.Core
             return true;
         }
 
-        public IEnumerable<Vector3Int> GetPositionsForObject(Vector3Int gridPosition, Vector3Int objectSize)
+        public IEnumerable<Vector3Int> GetPositionsForObject(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
         {
-            return CalculatePositions(gridPosition, objectSize);
+            return CalculatePositions(gridPosition, occupiedCells);
         }
 
         public bool HasObjectAt(Vector3Int gridPosition)

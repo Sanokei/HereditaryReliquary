@@ -19,7 +19,7 @@ namespace GridBuilder.Core
         private struct PlacementGeometry
         {
             public Vector3Int Origin;
-            public Vector3Int Size;
+            public List<Vector3Int> OccupiedCells;
             public Vector3 PreviewCenter;
         }
 
@@ -53,7 +53,7 @@ namespace GridBuilder.Core
             {
                 previewSystem.StartShowingPlacementPreview(
                     database.objectsData[selectedObjectIndex].Prefab,
-                    database.objectsData[selectedObjectIndex].Size,
+                    database.objectsData[selectedObjectIndex].OccupiedCells,
                     grid);
             }
             else
@@ -85,36 +85,26 @@ namespace GridBuilder.Core
             }
             soundFeedback.PlaySound(SoundType.Place);
             
-            // Calculate placement position to match preview exactly
-            // Preview calculation in UpdateState: center + centerOffset
-            // Preview calculation in MovePreview: position + pivotOffset
-            // Final preview position: center + centerOffset + pivotOffset
-            // Since centerOffset = (size-1) * cellSize * 0.5 and pivotOffset = -(size-1) * cellSize * 0.5
-            // They cancel out, so preview ends up at: grid.GetCellCenterWorld(gridPosition)
-            Vector3Int objectSize = geometry.Size;
-            Vector3 cellSize = grid.cellSize;
-            Vector3 pivotOffset = new Vector3(
-                -(objectSize.x - 1) * cellSize.x * 0.5f,
-                -(objectSize.y - 1) * cellSize.y * 0.5f,
-                -(objectSize.z - 1) * cellSize.z * 0.5f);
-            
-            // Match preview calculation exactly: previewCenter + pivotOffset
-            Vector3 placementPosition = geometry.PreviewCenter + pivotOffset;
+            // Calculate placement position - use the grid position directly
+            Vector3 placementPosition = grid.GetCellCenterWorld(geometry.Origin);
             
             Quaternion rotation = Quaternion.Euler(0, currentRotation, 0);
             int index = objectPlacer.PlaceObject(database.objectsData[selectedObjectIndex].Prefab,
                 placementPosition, rotation);
 
+            // Get rotated occupied cells
+            List<Vector3Int> rotatedCells = RotateOccupiedCells(geometry.OccupiedCells, currentRotation);
+            
             // Add object to all containers that contain parts of it
             if (splineGridContainers != null && splineGridContainers.Count > 0)
             {
-                AddObjectToRelevantContainers(geometry.Origin, objectSize, index);
+                AddObjectToRelevantContainers(geometry.Origin, rotatedCells, index);
             }
             else
             {
                 // Fallback to single container
                 gridData.AddObjectAt(geometry.Origin,
-                    database.objectsData[selectedObjectIndex].Size,
+                    rotatedCells,
                     database.objectsData[selectedObjectIndex].ID,
                     index);
             }
@@ -126,30 +116,33 @@ namespace GridBuilder.Core
 
         private bool CheckPlacementValidity(Vector3Int gridPosition, int selectedObjectIndex, out PlacementGeometry geometry)
         {
-            Vector3Int objectSize = database.objectsData[selectedObjectIndex].Size;
-            geometry = CalculatePlacementGeometry(gridPosition, objectSize);
+            List<Vector3Int> occupiedCells = database.objectsData[selectedObjectIndex].OccupiedCells;
+            geometry = CalculatePlacementGeometry(gridPosition, occupiedCells);
+            
+            // Get rotated cells for validity check
+            List<Vector3Int> rotatedCells = RotateOccupiedCells(occupiedCells, currentRotation);
             
             // Check across all active containers if available
             if (splineGridContainers != null && splineGridContainers.Count > 0)
             {
-                return CanPlaceObjectAcrossContainers(geometry.Origin, objectSize);
+                return CanPlaceObjectAcrossContainers(geometry.Origin, rotatedCells);
             }
             
             // Check if within spline boundary if current container is available
             if (currentContainer != null)
             {
-                return currentContainer.CanPlaceObjectAt(geometry.Origin, objectSize);
+                return currentContainer.CanPlaceObjectAt(geometry.Origin, rotatedCells);
             }
             
             // Fallback to grid data check only
-            return gridData.CanPlaceObejctAt(geometry.Origin, objectSize);
+            return gridData.CanPlaceObejctAt(geometry.Origin, rotatedCells);
         }
         
         /// <summary>
         /// Checks if an object can be placed across multiple containers.
         /// Each cell must be within at least one container, and no collisions across all containers.
         /// </summary>
-        private bool CanPlaceObjectAcrossContainers(Vector3Int gridPosition, Vector3Int objectSize)
+        private bool CanPlaceObjectAcrossContainers(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
         {
             if (splineGridContainers == null || splineGridContainers.Count == 0)
                 return false;
@@ -163,34 +156,28 @@ namespace GridBuilder.Core
             Dictionary<Vector3Int, List<SplineGridContainer>> cellContainers = new Dictionary<Vector3Int, List<SplineGridContainer>>();
             
             // Check all cells the object would occupy
-            for (int x = 0; x < objectSize.x; x++)
+            foreach (var cell in occupiedCells)
             {
-                for (int y = 0; y < objectSize.y; y++)
+                Vector3Int cellPos = gridPosition + cell;
+                Vector3 worldPos = referenceGrid.GetCellCenterWorld(cellPos);
+                
+                // Find which containers contain this cell
+                List<SplineGridContainer> containingContainers = new List<SplineGridContainer>();
+                foreach (var container in splineGridContainers)
                 {
-                    for (int z = 0; z < objectSize.z; z++)
+                    if (container != null && container.IsPositionWithinBoundary(worldPos))
                     {
-                        Vector3Int cellPos = gridPosition + new Vector3Int(x, y, z);
-                        Vector3 worldPos = referenceGrid.GetCellCenterWorld(cellPos);
-                        
-                        // Find which containers contain this cell
-                        List<SplineGridContainer> containingContainers = new List<SplineGridContainer>();
-                        foreach (var container in splineGridContainers)
-                        {
-                            if (container != null && container.IsPositionWithinBoundary(worldPos))
-                            {
-                                containingContainers.Add(container);
-                            }
-                        }
-                        
-                        // If no container contains this cell, placement is invalid
-                        if (containingContainers.Count == 0)
-                        {
-                            return false;
-                        }
-                        
-                        cellContainers[cellPos] = containingContainers;
+                        containingContainers.Add(container);
                     }
                 }
+                
+                // If no container contains this cell, placement is invalid
+                if (containingContainers.Count == 0)
+                {
+                    return false;
+                }
+                
+                cellContainers[cellPos] = containingContainers;
             }
             
             // Check for collisions across all relevant containers
@@ -254,7 +241,7 @@ namespace GridBuilder.Core
         /// <summary>
         /// Adds an object to all containers that contain parts of it
         /// </summary>
-        private void AddObjectToRelevantContainers(Vector3Int gridPosition, Vector3Int objectSize, int objectIndex)
+        private void AddObjectToRelevantContainers(Vector3Int gridPosition, List<Vector3Int> occupiedCells, int objectIndex)
         {
             if (splineGridContainers == null || splineGridContainers.Count == 0)
                 return;
@@ -267,27 +254,22 @@ namespace GridBuilder.Core
             Dictionary<SplineGridContainer, List<Vector3Int>> containerCells = new Dictionary<SplineGridContainer, List<Vector3Int>>();
             
             // Determine which cells belong to which containers
-            for (int x = 0; x < objectSize.x; x++)
+            foreach (var cell in occupiedCells)
             {
-                for (int y = 0; y < objectSize.y; y++)
+                Vector3Int cellPos = gridPosition + cell;
+                Vector3 worldPos = referenceGrid.GetCellCenterWorld(cellPos);
+                
+                // Find which containers contain this cell
+                foreach (var container in splineGridContainers)
                 {
-                    for (int z = 0; z < objectSize.z; z++)
+                    if (container != null && container.IsPositionWithinBoundary(worldPos))
                     {
-                        Vector3Int cellPos = gridPosition + new Vector3Int(x, y, z);
-                        Vector3 worldPos = referenceGrid.GetCellCenterWorld(cellPos);
-                        
-                        // Find which containers contain this cell
-                        foreach (var container in splineGridContainers)
+                        if (!containerCells.ContainsKey(container))
                         {
-                            if (container != null && container.IsPositionWithinBoundary(worldPos))
-                            {
-                                if (!containerCells.ContainsKey(container))
-                                {
-                                    containerCells[container] = new List<Vector3Int>();
-                                }
-                                containerCells[container].Add(cellPos);
-                            }
+                            containerCells[container] = new List<Vector3Int>();
                         }
+                        // Store the cell relative to gridPosition for this container
+                        containerCells[container].Add(cell);
                     }
                 }
             }
@@ -298,41 +280,14 @@ namespace GridBuilder.Core
                 SplineGridContainer container = kvp.Key;
                 List<Vector3Int> cells = kvp.Value;
                 
-                // For each container, we need to add the object at the minimum cell position
-                // that's within that container's grid space
                 if (cells.Count > 0)
                 {
-                    // Find the minimum cell position for this container
-                    Vector3Int minCell = cells[0];
-                    foreach (var cell in cells)
-                    {
-                        if (cell.x < minCell.x || (cell.x == minCell.x && cell.z < minCell.z) || 
-                            (cell.x == minCell.x && cell.z == minCell.z && cell.y < minCell.y))
-                        {
-                            minCell = cell;
-                        }
-                    }
-                    
-                    // Calculate the size relative to this container's grid
-                    // We need to find the bounding box of cells in this container
-                    Vector3Int maxCell = cells[0];
-                    foreach (var cell in cells)
-                    {
-                        if (cell.x > maxCell.x || (cell.x == maxCell.x && cell.z > maxCell.z) || 
-                            (cell.x == maxCell.x && cell.z == maxCell.z && cell.y > maxCell.y))
-                        {
-                            maxCell = cell;
-                        }
-                    }
-                    
-                    Vector3Int containerObjectSize = maxCell - minCell + Vector3Int.one;
-                    
-                    // Convert world cell position to container's grid space
-                    Vector3 worldMinPos = referenceGrid.GetCellCenterWorld(minCell);
-                    Vector3Int containerGridPos = container.Grid.WorldToCell(worldMinPos);
+                    // Convert grid position to container's grid space
+                    Vector3 worldPos = referenceGrid.GetCellCenterWorld(gridPosition);
+                    Vector3Int containerGridPos = container.Grid.WorldToCell(worldPos);
                     
                     container.GridData.AddObjectAt(containerGridPos,
-                        containerObjectSize,
+                        cells,
                         database.objectsData[selectedObjectIndex].ID,
                         objectIndex);
                 }
@@ -353,31 +308,60 @@ namespace GridBuilder.Core
             return currentRotation;
         }
         
-        private PlacementGeometry CalculatePlacementGeometry(Vector3Int gridPosition, Vector3Int objectSize)
+        private PlacementGeometry CalculatePlacementGeometry(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
         {
-            Vector3 cellSize = grid.cellSize;
             Vector3 pointerCellCenter = grid.GetCellCenterWorld(gridPosition);
-            Vector3 centerOffset = new Vector3(
-                (objectSize.x - 1) * cellSize.x * 0.5f,
-                (objectSize.y - 1) * cellSize.y * 0.5f,
-                (objectSize.z - 1) * cellSize.z * 0.5f);
-
-            Vector3 previewCenter = pointerCellCenter + centerOffset;
-
-            Vector3 halfSizeWorld = Vector3.Scale(new Vector3(objectSize.x, objectSize.y, objectSize.z), cellSize) * 0.5f;
-            Vector3 minCellCenterWorld = previewCenter - halfSizeWorld + new Vector3(
-                cellSize.x * 0.5f,
-                cellSize.y * 0.5f,
-                cellSize.z * 0.5f);
-
-            Vector3Int origin = grid.WorldToCell(minCellCenterWorld);
 
             return new PlacementGeometry
             {
-                Origin = origin,
-                Size = objectSize,
-                PreviewCenter = previewCenter
+                Origin = gridPosition,
+                OccupiedCells = occupiedCells,
+                PreviewCenter = pointerCellCenter
             };
+        }
+        
+        private List<Vector3Int> RotateOccupiedCells(List<Vector3Int> cells, float yRotation)
+        {
+            // Normalize rotation to 0, 90, 180, 270 degrees
+            int rotationSteps = Mathf.RoundToInt(yRotation / 90f) % 4;
+            if (rotationSteps < 0) rotationSteps += 4;
+            
+            if (rotationSteps == 0)
+                return new List<Vector3Int>(cells);
+            
+            // Calculate center of occupied cells
+            Vector3 center = Vector3.zero;
+            foreach (var cell in cells)
+            {
+                center += new Vector3(cell.x, cell.y, cell.z);
+            }
+            center /= cells.Count;
+            
+            List<Vector3Int> rotatedCells = new List<Vector3Int>();
+            
+            foreach (var cell in cells)
+            {
+                // Translate to origin
+                Vector3 relative = new Vector3(cell.x, cell.y, cell.z) - center;
+                
+                // Apply 90-degree rotations
+                for (int i = 0; i < rotationSteps; i++)
+                {
+                    float temp = relative.x;
+                    relative.x = -relative.z;
+                    relative.z = temp;
+                }
+                
+                // Translate back and round to int
+                Vector3 rotated = relative + center;
+                rotatedCells.Add(new Vector3Int(
+                    Mathf.RoundToInt(rotated.x),
+                    Mathf.RoundToInt(rotated.y),
+                    Mathf.RoundToInt(rotated.z)
+                ));
+            }
+            
+            return rotatedCells;
         }
     }
 
