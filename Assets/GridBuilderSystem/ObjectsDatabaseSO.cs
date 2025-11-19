@@ -245,11 +245,6 @@ namespace GridBuilder.Core
                 Vector3 boundsMax = prefabBounds.max;
                 Vector3 boundsSize = prefabBounds.size;
                 
-                // Debug: Log bounds info
-                #if UNITY_EDITOR
-                UnityEngine.Debug.Log($"[CalculateOccupiedCells] Prefab: {Prefab.name}, Bounds size: {boundsSize}, Bounds min: {boundsMin}, Bounds max: {boundsMax}, CellSize: {cellSize}");
-                #endif
-                
                 // Calculate grid dimensions using the exact same math as the editor's CalculateGridDimensions
                 Vector3 size = prefabBounds.size;
                 Vector3Int gridDimensions = new Vector3Int(
@@ -257,11 +252,6 @@ namespace GridBuilder.Core
                     Mathf.CeilToInt(size.y / cellSize),
                     Mathf.CeilToInt(size.z / cellSize)
                 );
-                
-                // Debug: Log grid dimensions
-                #if UNITY_EDITOR
-                UnityEngine.Debug.Log($"[CalculateOccupiedCells] Grid dimensions: {gridDimensions}");
-                #endif
                 
                 // Calculate which cells are occupied using the same logic as CreateGridFloorMesh
                 // The grid floor creates quads from (0,0) to (gridDimensions.x-1, gridDimensions.z-1) with Y=0
@@ -281,11 +271,6 @@ namespace GridBuilder.Core
                 {
                     occupiedCells.Add(Vector3Int.zero);
                 }
-                
-                // Debug: Log final occupied cells
-                #if UNITY_EDITOR
-                UnityEngine.Debug.Log($"[CalculateOccupiedCells] Final occupied cells count: {occupiedCells.Count}, Cells: {string.Join(", ", occupiedCells)}");
-                #endif
                 
                 // Set occupied cells using reflection
                 occupiedCellsFieldInfo.SetValue(this, occupiedCells);
