@@ -20,8 +20,8 @@ MonoBehaviour:
   - <Name>k__BackingField: X
     <ID>k__BackingField: 0
     <OccupiedCells>k__BackingField:
-    - {x: 0, y: 0, z: 0}
     - {x: 1, y: 0, z: 0}
+    - {x: 0, y: 0, z: 0}
     - {x: 2, y: 0, z: 0}
     <Prefab>k__BackingField: {fileID: 954874420246580437, guid: 36d10511304c4e54bb5da3aa008fe27d, type: 3}
     placementValidators: []
@@ -29,6 +29,14 @@ MonoBehaviour:
     <ID>k__BackingField: 1
     <OccupiedCells>k__BackingField:
     - {x: 0, y: 0, z: 0}
+    - {x: 0, y: 0, z: 2}
+    - {x: 0, y: 0, z: 1}
+    - {x: 1, y: 0, z: 2}
+    - {x: 1, y: 0, z: 1}
+    - {x: 1, y: 0, z: 0}
+    - {x: 2, y: 0, z: 0}
+    - {x: 2, y: 0, z: 1}
+    - {x: 2, y: 0, z: 2}
     <Prefab>k__BackingField: {fileID: 8409257631567611965, guid: eb0bbcd23b5e601468dd0aa1c405575f, type: 3}
     placementValidators: []
   previousCellSize: 1

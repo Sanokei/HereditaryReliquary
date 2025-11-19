@@ -29,6 +29,12 @@ namespace GridBuilder.Core
         private Grid previousGrid;
         private float currentRotation = 0f;
         private PreviewSystem previewSystemRef;
+        
+        // Cache for performance optimization
+        private List<Vector3Int> cachedOccupiedCells;
+        private float cachedRotation = float.NaN;
+        private Vector3 cachedCenterOffset = Vector3.zero;
+        private bool centerOffsetDirty = true;
 
         public PlacementState(int iD,
                             Grid grid,
@@ -118,7 +124,8 @@ namespace GridBuilder.Core
             }
             soundFeedback.PlaySound(SoundType.Place);
             
-            // Calculate placement position - use the preview center which accounts for multi-cell objects and rotation
+            // Calculate placement position - use the center of all occupied cells for correct multi-cell centering
+            // This ensures the object is placed centered on all its occupied cells, not just the origin cell
             Vector3 placementPosition = geometry.PreviewCenter;
             
             // Keep object on ground level
@@ -463,6 +470,12 @@ namespace GridBuilder.Core
                 
                 if (containerChanged || gridChanged)
                 {
+                    // Invalidate cache when container/grid changes (cell size might be different)
+                    centerOffsetDirty = true;
+                }
+                
+                if (containerChanged || gridChanged)
+                {
                     // Update preview with converted cells if container/grid changed
                     if (selectedObjectIndex >= 0 && selectedObjectIndex < database.objectsData.Count)
                     {
@@ -507,8 +520,8 @@ namespace GridBuilder.Core
             PlacementGeometry geometry;
             bool placementValidity = CheckPlacementValidity(gridPosition, selectedObjectIndex, out geometry);
 
-            // Calculate position for preview - needs to account for multi-cell objects
-            // The preview system will apply the same offset to both preview and indicator
+            // Use the center of all occupied cells for preview position
+            // This ensures preview and placement match exactly, even if slightly offset from mouse cursor for multi-cell objects
             Vector3 previewPosition = geometry.PreviewCenter;
             
             previewSystem.UpdatePosition(previewPosition, placementValidity);
@@ -587,10 +600,14 @@ namespace GridBuilder.Core
         
         public void SetRotation(float rotation)
         {
-            currentRotation = rotation;
-            if (previewSystemRef != null)
+            if (currentRotation != rotation)
             {
-                previewSystemRef.SetRotation(rotation);
+                currentRotation = rotation;
+                centerOffsetDirty = true; // Mark cache as dirty when rotation changes
+                if (previewSystemRef != null)
+                {
+                    previewSystemRef.SetRotation(rotation);
+                }
             }
         }
         
@@ -601,20 +618,70 @@ namespace GridBuilder.Core
         
         private PlacementGeometry CalculatePlacementGeometry(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
         {
-            // Get rotated cells for this calculation
-            List<Vector3Int> rotatedCells = RotateOccupiedCells(occupiedCells, currentRotation);
+            // Check if we need to recalculate center offset (only when rotation or occupied cells change)
+            bool needsRecalculation = centerOffsetDirty || 
+                                     cachedRotation != currentRotation || 
+                                     cachedOccupiedCells == null || 
+                                     !ListsEqual(cachedOccupiedCells, occupiedCells);
             
-            // PreviewCenter should be the world position of the grid cell under the mouse cursor
-            // This ensures the object's visual center aligns with the mouse cursor
-            // The object's pivot will be adjusted to align its bounds center with this position
-            Vector3 centerWorld = grid.GetCellCenterWorld(gridPosition);
+            if (needsRecalculation)
+            {
+                // Get rotated cells for this calculation
+                List<Vector3Int> rotatedCells = RotateOccupiedCells(occupiedCells, currentRotation);
+                
+                // Calculate the center of occupied cells in local space (relative to origin at 0,0,0)
+                // This tells us where the center is relative to the origin cell
+                cachedCenterOffset = Vector3.zero;
+                if (rotatedCells.Count > 0)
+                {
+                    foreach (var cell in rotatedCells)
+                    {
+                        cachedCenterOffset += new Vector3(cell.x, cell.y, cell.z);
+                    }
+                    cachedCenterOffset /= rotatedCells.Count;
+                }
+                
+                // Update cache
+                cachedRotation = currentRotation;
+                cachedOccupiedCells = new List<Vector3Int>(occupiedCells);
+                centerOffsetDirty = false;
+            }
+            
+            // Calculate what the origin should be so that the center of occupied cells aligns with gridPosition
+            // If centerOffset is (0.5, 0, 0.5), we need to offset origin by -centerOffset to center on gridPosition
+            Vector3Int originOffset = new Vector3Int(
+                Mathf.RoundToInt(-cachedCenterOffset.x),
+                Mathf.RoundToInt(-cachedCenterOffset.y),
+                Mathf.RoundToInt(-cachedCenterOffset.z)
+            );
+            Vector3Int calculatedOrigin = gridPosition + originOffset;
+            
+            // PreviewCenter is where the mouse hit (grid cell center)
+            // The preview/placement systems will center the object's visual bounds on this position
+            // The calculated origin ensures the center of occupied cells aligns with this position
+            Vector3 previewCenter = grid.GetCellCenterWorld(gridPosition);
 
             return new PlacementGeometry
             {
-                Origin = gridPosition,
+                Origin = calculatedOrigin,
                 OccupiedCells = occupiedCells,
-                PreviewCenter = centerWorld
+                PreviewCenter = previewCenter
             };
+        }
+        
+        private bool ListsEqual(List<Vector3Int> list1, List<Vector3Int> list2)
+        {
+            // Quick reference equality check
+            if (ReferenceEquals(list1, list2)) return true;
+            if (list1 == null || list2 == null) return false;
+            if (list1.Count != list2.Count) return false;
+            
+            // Element-by-element comparison only if references differ
+            for (int i = 0; i < list1.Count; i++)
+            {
+                if (list1[i] != list2[i]) return false;
+            }
+            return true;
         }
         
         private List<Vector3Int> RotateOccupiedCells(List<Vector3Int> cells, float yRotation)
