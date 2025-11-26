@@ -7,7 +7,7 @@ namespace GridBuilder.Core
 {
     public class GridData
     {
-        Dictionary<Vector3Int, PlacementData> placedObjects = new();
+        protected Dictionary<Vector3Int, PlacementData> placedObjects = new();
         private Vector3? gridSize = null;
         private Vector3? cellSize = null;
         private Vector3? anchorPoint = null;
@@ -19,7 +19,7 @@ namespace GridBuilder.Core
             this.anchorPoint = anchorPoint;
         }
 
-        public void AddObjectAt(Vector3Int gridPosition,
+        public virtual void AddObjectAt(Vector3Int gridPosition,
                                 List<Vector3Int> occupiedCells,
                                 int ID,
                                 int placedObjectIndex)
@@ -34,7 +34,7 @@ namespace GridBuilder.Core
             }
         }
 
-        private List<Vector3Int> CalculatePositions(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
+        protected List<Vector3Int> CalculatePositions(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
         {
             List<Vector3Int> returnVal = new();
             foreach (var cell in occupiedCells)
@@ -44,7 +44,7 @@ namespace GridBuilder.Core
             return returnVal;
         }
 
-        public bool CanPlaceObejctAt(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
+        public virtual bool CanPlaceObejctAt(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
         {
             List<Vector3Int> positionToOccupy = CalculatePositions(gridPosition, occupiedCells);
             
@@ -57,7 +57,7 @@ namespace GridBuilder.Core
             return true;
         }
 
-        public bool IsWithinGridBounds(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
+        public virtual bool IsWithinGridBounds(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
         {
             // If grid properties are not set, assume unbounded grid
             if (!gridSize.HasValue || !anchorPoint.HasValue)
@@ -98,7 +98,7 @@ namespace GridBuilder.Core
             return CalculatePositions(gridPosition, occupiedCells);
         }
 
-        public bool HasObjectAt(Vector3Int gridPosition)
+        public virtual bool HasObjectAt(Vector3Int gridPosition)
         {
             return placedObjects.ContainsKey(gridPosition);
         }
@@ -123,7 +123,7 @@ namespace GridBuilder.Core
             return placedObjects[gridPosition].PlacedObjectIndex;
         }
 
-        internal void RemoveObjectAt(Vector3Int gridPosition)
+        internal virtual void RemoveObjectAt(Vector3Int gridPosition)
         {
             foreach (var pos in placedObjects[gridPosition].occupiedPositions)
             {
@@ -134,7 +134,7 @@ namespace GridBuilder.Core
         /// <summary>
         /// Gets the object ID at a specific grid position
         /// </summary>
-        public int GetObjectIDAt(Vector3Int gridPosition)
+        public virtual int GetObjectIDAt(Vector3Int gridPosition)
         {
             if (placedObjects.ContainsKey(gridPosition))
             {
@@ -146,7 +146,7 @@ namespace GridBuilder.Core
         /// <summary>
         /// Gets object IDs from adjacent cells (4 directions: N, S, E, W in X/Z plane)
         /// </summary>
-        public List<int> GetAdjacentObjectIDs(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
+        public virtual List<int> GetAdjacentObjectIDs(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
         {
             List<int> adjacentIDs = new List<int>();
             HashSet<int> foundIDs = new HashSet<int>();
@@ -171,10 +171,10 @@ namespace GridBuilder.Core
                     {
                         int objectID = placedObjects[adjacentPos].ID;
                         if (!foundIDs.Contains(objectID))
-                        {
-                            foundIDs.Add(objectID);
-                            adjacentIDs.Add(objectID);
-                        }
+                    {
+                        foundIDs.Add(objectID);
+                        adjacentIDs.Add(objectID);
+                    }
                     }
                 }
             }
@@ -185,7 +185,7 @@ namespace GridBuilder.Core
         /// <summary>
         /// Counts all objects with the given ID
         /// </summary>
-        public int CountObjectsByID(int objectID)
+        public virtual int CountObjectsByID(int objectID)
         {
             HashSet<int> countedObjects = new HashSet<int>();
             int count = 0;
@@ -210,7 +210,7 @@ namespace GridBuilder.Core
         /// Counts all objects from the given database
         /// Note: This requires checking object IDs against the database, so it's a helper that works with database reference
         /// </summary>
-        public int CountObjectsByDatabase(ObjectsDatabaseSO database)
+        public virtual int CountObjectsByDatabase(ObjectsDatabaseSO database)
         {
             if (database == null || database.objectsData == null)
                 return 0;
@@ -243,7 +243,7 @@ namespace GridBuilder.Core
         /// <summary>
         /// Gets the total count of all unique objects in the grid
         /// </summary>
-        public int GetAllObjectCount()
+        public virtual int GetAllObjectCount()
         {
             HashSet<int> uniqueObjects = new HashSet<int>();
             foreach (var kvp in placedObjects)
@@ -256,7 +256,7 @@ namespace GridBuilder.Core
         /// <summary>
         /// Gets all unique object IDs in the grid
         /// </summary>
-        public List<int> GetAllObjectIDs()
+        public virtual List<int> GetAllObjectIDs()
         {
             HashSet<int> uniqueIDs = new HashSet<int>();
             foreach (var kvp in placedObjects)
@@ -269,7 +269,7 @@ namespace GridBuilder.Core
         /// <summary>
         /// Gets all unique PlacementData objects in the grid
         /// </summary>
-        public List<PlacementData> GetAllPlacementData()
+        public virtual List<PlacementData> GetAllPlacementData()
         {
             HashSet<int> seenIndices = new HashSet<int>();
             List<PlacementData> result = new List<PlacementData>();

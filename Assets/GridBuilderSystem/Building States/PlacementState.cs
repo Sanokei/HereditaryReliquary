@@ -153,7 +153,6 @@ namespace GridBuilder.Core
             // Calculate the object's bounds to ensure it doesn't clip through the floor
             // Get bounds from prefab's mesh filters without instantiating
             MeshFilter[] meshFilters = prefab.GetComponentsInChildren<MeshFilter>();
-            float bottomOffset = 0f;
             
             if (meshFilters.Length > 0)
             {

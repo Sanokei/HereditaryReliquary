@@ -9,6 +9,7 @@ namespace GridBuilder.Core
     /// and provides grid visualization with a material.
     /// </summary>
     [RequireComponent(typeof(SplineContainer))]
+    [ExecuteAlways]
     public class SplineGridContainer : MonoBehaviour
     {
         private SplineContainer splineContainer;
@@ -22,7 +23,7 @@ namespace GridBuilder.Core
         private GameObject gridVisualization;
         private MeshFilter meshFilter;
         private MeshRenderer meshRenderer;
-        private GridData gridData;
+        protected GridData gridData;
         private int previousCellSize;
         
         public SplineContainer SplineContainer => splineContainer;
@@ -32,27 +33,51 @@ namespace GridBuilder.Core
         public int GridCellSize => gridCellSize;
         public CellSizePlacementMode PlacementMode => placementMode;
         
-        private void Awake()
+        protected virtual void Awake()
         {
             // Get SplineContainer component from the same GameObject
             splineContainer = GetComponent<SplineContainer>();
             
-            gridData = new GridData();
+            gridData = CreateGridData();
             previousCellSize = gridCellSize;
             UpdateSplineFromGridSize();
             InitializeGrid();
             GenerateGridVisualization();
         }
+
+        protected virtual GridData CreateGridData()
+        {
+            return new GridData();
+        }
         
-        private void InitializeGrid()
+        protected virtual void InitializeGrid()
         {
             if (grid == null)
             {
-                GameObject gridObject = new GameObject("Grid");
-                gridObject.transform.SetParent(transform);
-                gridObject.transform.localPosition = Vector3.zero;
-                grid = gridObject.AddComponent<Grid>();
-                grid.cellSize = new Vector3(gridCellSize, gridCellSize, gridCellSize);
+                Transform existingGrid = transform.Find("Grid");
+                if (existingGrid != null)
+                {
+                    grid = existingGrid.GetComponent<Grid>();
+                }
+
+                if (grid == null)
+                {
+                    if (existingGrid != null)
+                    {
+                         if (Application.isPlaying) Destroy(existingGrid.gameObject);
+                         else DestroyImmediate(existingGrid.gameObject);
+                    }
+
+                    GameObject gridObject = new GameObject("Grid");
+                    gridObject.transform.SetParent(transform);
+                    gridObject.transform.localPosition = Vector3.zero;
+                    grid = gridObject.AddComponent<Grid>();
+                    grid.cellSize = new Vector3(gridCellSize, gridCellSize, gridCellSize);
+                }
+                else
+                {
+                    UpdateGridCellSize();
+                }
             }
             else
             {
@@ -64,7 +89,7 @@ namespace GridBuilder.Core
         /// <summary>
         /// Updates the grid's cell size
         /// </summary>
-        private void UpdateGridCellSize()
+        protected virtual void UpdateGridCellSize()
         {
             if (grid != null)
             {
@@ -72,32 +97,50 @@ namespace GridBuilder.Core
             }
         }
         
-        private void GenerateGridVisualization()
+        protected virtual void GenerateGridVisualization()
         {
             if (splineContainer == null || splineContainer.Spline == null)
                 return;
                 
             if (gridVisualization == null)
             {
-                gridVisualization = new GameObject("GridVisualization");
-                gridVisualization.transform.SetParent(transform);
-                gridVisualization.transform.localPosition = Vector3.zero;
-                meshFilter = gridVisualization.AddComponent<MeshFilter>();
-                meshRenderer = gridVisualization.AddComponent<MeshRenderer>();
-                MeshCollider meshCollider = gridVisualization.AddComponent<MeshCollider>();
-                gridVisualization.SetActive(false);
-                
-                if (gridMaterial != null)
+                Transform existingViz = transform.Find("GridVisualization");
+                if (existingViz != null)
                 {
-                    meshRenderer.material = gridMaterial;
+                    gridVisualization = existingViz.gameObject;
+                    meshFilter = gridVisualization.GetComponent<MeshFilter>();
+                    meshRenderer = gridVisualization.GetComponent<MeshRenderer>();
                 }
-                
-                // Set layer based on placement layer mask
-                int layer = GetLayerFromLayerMask(placementLayerMask);
-                if (layer >= 0)
+
+                if (gridVisualization == null)
                 {
-                    gridVisualization.layer = layer;
+                    gridVisualization = new GameObject("GridVisualization");
+                    gridVisualization.transform.SetParent(transform);
+                    gridVisualization.transform.localPosition = Vector3.zero;
+                    meshFilter = gridVisualization.AddComponent<MeshFilter>();
+                    meshRenderer = gridVisualization.AddComponent<MeshRenderer>();
+                    MeshCollider meshCollider = gridVisualization.AddComponent<MeshCollider>();
+                    gridVisualization.SetActive(false);
+                    
+                    if (gridMaterial != null)
+                    {
+                        meshRenderer.material = gridMaterial;
+                    }
+                    
+                    // Set layer based on placement layer mask
+                    int layer = GetLayerFromLayerMask(placementLayerMask);
+                    if (layer >= 0)
+                    {
+                        gridVisualization.layer = layer;
+                    }
                 }
+            }
+
+            // Ensure references
+            if (gridVisualization != null)
+            {
+                if (meshFilter == null) meshFilter = gridVisualization.GetComponent<MeshFilter>();
+                if (meshRenderer == null) meshRenderer = gridVisualization.GetComponent<MeshRenderer>();
             }
             
             CreatePolygonMesh();
@@ -124,22 +167,38 @@ namespace GridBuilder.Core
                 points.Add(localPos);
             }
             
-            // Create mesh from polygon
-            Mesh mesh = CreatePolygonMeshFromPoints(points);
-            meshFilter.mesh = mesh;
-            
-            // Update mesh collider if it exists
-            MeshCollider meshCollider = gridVisualization.GetComponent<MeshCollider>();
-            if (meshCollider != null)
+            // Create or reuse mesh
+            Mesh mesh = null;
+            if (meshFilter != null)
             {
-                meshCollider.sharedMesh = mesh;
+                mesh = meshFilter.sharedMesh;
+                if (mesh == null)
+                {
+                    mesh = new Mesh();
+                    mesh.name = "SplineGridMesh";
+                    meshFilter.sharedMesh = mesh;
+                }
+            }
+            
+            if (mesh != null)
+            {
+                UpdatePolygonMeshFromPoints(mesh, points);
+                
+                // Update mesh collider if it exists
+                if (gridVisualization != null)
+                {
+                    MeshCollider meshCollider = gridVisualization.GetComponent<MeshCollider>();
+                    if (meshCollider != null)
+                    {
+                        meshCollider.sharedMesh = mesh;
+                    }
+                }
             }
         }
         
-        private Mesh CreatePolygonMeshFromPoints(List<Vector3> points)
+        private void UpdatePolygonMeshFromPoints(Mesh mesh, List<Vector3> points)
         {
-            Mesh mesh = new Mesh();
-            mesh.name = "SplineGridMesh";
+            mesh.Clear();
             
             // Project points to XZ plane (Y = 0)
             List<Vector3> projectedPoints = new List<Vector3>();
@@ -162,8 +221,6 @@ namespace GridBuilder.Core
             mesh.triangles = triangles.ToArray();
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
-            
-            return mesh;
         }
         
         /// <summary>
@@ -304,7 +361,7 @@ namespace GridBuilder.Core
         /// <summary>
         /// Checks if all grid positions for an object are within the boundary
         /// </summary>
-        public bool CanPlaceObjectAt(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
+        public virtual bool CanPlaceObjectAt(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
         {
             if (grid == null)
                 return false;
@@ -325,6 +382,11 @@ namespace GridBuilder.Core
             return gridData.CanPlaceObejctAt(gridPosition, occupiedCells);
         }
         
+        protected virtual void OnDisable()
+        {
+            DestroyImmediate(gridVisualization);   
+        }
+
         public void ShowGrid()
         {
             if (gridVisualization != null)
@@ -361,7 +423,7 @@ namespace GridBuilder.Core
         /// Updates the spline container to match the gridSize, creating a rectangular boundary
         /// The actual world size is gridSize * gridCellSize, so the spline scales with cell size
         /// </summary>
-        private void UpdateSplineFromGridSize()
+        protected virtual void UpdateSplineFromGridSize()
         {
             if (splineContainer == null)
                 return;
@@ -431,16 +493,31 @@ namespace GridBuilder.Core
                 previousCellSize = gridCellSize;
             }
             
-            if (Application.isPlaying && gridVisualization != null)
+            if (gridVisualization != null || !Application.isPlaying)
             {
                 GenerateGridVisualization();
                 
                 // Update layer if placement layer mask changed
                 int layer = GetLayerFromLayerMask(placementLayerMask);
-                if (layer >= 0)
+                if (layer >= 0 && gridVisualization != null)
                 {
                     gridVisualization.layer = layer;
                 }
+            }
+        }
+
+        protected virtual void OnDestroy()
+        {
+            if (grid != null)
+            {
+                if (Application.isPlaying) Destroy(grid.gameObject);
+                else DestroyImmediate(grid.gameObject);
+            }
+            
+            if (gridVisualization != null)
+            {
+                if (Application.isPlaying) Destroy(gridVisualization);
+                else DestroyImmediate(gridVisualization);
             }
         }
         

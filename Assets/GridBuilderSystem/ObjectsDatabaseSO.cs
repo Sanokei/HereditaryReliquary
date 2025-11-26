@@ -11,7 +11,7 @@ namespace GridBuilder.Core
         ScaleObject    // Scale the object prefab to match cell size difference, no cell conversion
     }
     
-    [CreateAssetMenu]
+    [CreateAssetMenu(menuName = "GridBuilder/Objects Database", fileName = "ObjectsDatabaseSO")]
     public class ObjectsDatabaseSO : ScriptableObject
     {
         public LayerMask placementLayermask;
