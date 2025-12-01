@@ -52,7 +52,6 @@ CGINCLUDE
 		float4 viewInterpolator : TEXCOORD1;
 		float4 bumpCoords : TEXCOORD2;
 		float4 screenPos : TEXCOORD3;
-		float4 grabPassPos : TEXCOORD4; 
 		half3 worldRefl : TEXCOORD6;
 		float4 posWorld : TEXCOORD7;
         float3 normalDir : TEXCOORD8;
@@ -184,8 +183,6 @@ Subshader
 	
 	Lod 500
 	ColorMask RGB
-	
-	GrabPass { "_RefractionTex" }
 	
 	Pass {
 			Blend SrcAlpha OneMinusSrcAlpha

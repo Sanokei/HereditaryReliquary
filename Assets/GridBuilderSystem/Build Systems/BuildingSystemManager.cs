@@ -19,6 +19,11 @@ namespace GridBuilder.Core
         private List<SplineGridContainer> splineGridContainers = new();
         public List<ObjectsDatabaseSO> Databases = new();
         
+        [Header("Out of Bounds Collision")]
+        [SerializeField] private bool createOutofBounds = false;
+        [SerializeField, Min(0.1f)] private float outOfBoundsHeight = 5f;
+        private GameObject outOfBoundsCollider;
+        
         public enum BuildingSystem
         {
             Placement,
@@ -61,6 +66,12 @@ namespace GridBuilder.Core
                 
             // Initialize all systems with dependencies
             InitializeSystems();
+            
+            // Create out of bounds collider if enabled
+            if (createOutofBounds)
+            {
+                CreateOutOfBoundsCollider();
+            }
         }
 
         private void OnDestroy()
@@ -200,6 +211,170 @@ namespace GridBuilder.Core
 
             if (sceneCamera == null)
                 sceneCamera = Camera.main;
+            
+            // Update out of bounds collider if enabled
+            if (createOutofBounds && Application.isPlaying)
+            {
+                // Recreate collider to ensure it's up to date
+                CreateOutOfBoundsCollider();
+            }
+            else if (!createOutofBounds && outOfBoundsCollider != null)
+            {
+                DestroyOutOfBoundsCollider();
+            }
+        }
+        
+        /// <summary>
+        /// Creates a polygonal 3D collision box that surrounds all grids
+        /// </summary>
+        private void CreateOutOfBoundsCollider()
+        {
+            // Clean up existing collider and mesh if they exist
+            if (outOfBoundsCollider != null)
+            {
+                MeshCollider oldCollider = outOfBoundsCollider.GetComponent<MeshCollider>();
+                if (oldCollider != null && oldCollider.sharedMesh != null)
+                {
+                    Mesh oldMesh = oldCollider.sharedMesh;
+                    if (Application.isPlaying)
+                    {
+                        Destroy(oldMesh);
+                    }
+                    else
+                    {
+#if UNITY_EDITOR
+                        DestroyImmediate(oldMesh);
+#else
+                        Destroy(oldMesh);
+#endif
+                    }
+                }
+                DestroyOutOfBoundsCollider();
+            }
+            
+            if (splineGridContainers == null || splineGridContainers.Count == 0)
+            {
+                Debug.LogWarning("No SplineGridContainers found. Cannot create out of bounds collider.");
+                return;
+            }
+            
+            // Create the collider GameObject
+            outOfBoundsCollider = new GameObject("OutOfBoundsCollider");
+            outOfBoundsCollider.transform.SetParent(transform);
+            outOfBoundsCollider.transform.localPosition = Vector3.zero;
+            
+            // Create mesh for collision
+            Mesh collisionMesh = CreatePolygonalCollisionMesh();
+            
+            if (collisionMesh != null)
+            {
+                // Add MeshCollider component
+                MeshCollider meshCollider = outOfBoundsCollider.AddComponent<MeshCollider>();
+                meshCollider.sharedMesh = collisionMesh;
+                meshCollider.convex = false; // Use non-convex for complex shapes
+            }
+            else
+            {
+                Debug.LogWarning("Failed to create collision mesh for out of bounds collider.");
+                Destroy(outOfBoundsCollider);
+                outOfBoundsCollider = null;
+            }
+        }
+        
+        /// <summary>
+        /// Creates a mesh that forms walls around the grid boundaries
+        /// </summary>
+        private Mesh CreatePolygonalCollisionMesh()
+        {
+            List<Vector3> vertices = new List<Vector3>();
+            List<int> triangles = new List<int>();
+            
+            // Process each grid container
+            foreach (var container in splineGridContainers)
+            {
+                if (container == null)
+                    continue;
+                
+                // Get boundary polygon in world space (XZ plane)
+                List<Vector2> polygon = container.GetBoundaryPolygon();
+                
+                if (polygon == null || polygon.Count < 3)
+                    continue;
+                
+                // Get the container's transform to determine Y position
+                Transform containerTransform = container.transform;
+                float baseY = containerTransform.position.y;
+                
+                // Create walls for each edge of the polygon
+                for (int i = 0; i < polygon.Count; i++)
+                {
+                    Vector2 p1 = polygon[i];
+                    Vector2 p2 = polygon[(i + 1) % polygon.Count];
+                    
+                    // Create a quad (wall) for this edge
+                    // Bottom vertices
+                    Vector3 v1 = new Vector3(p1.x, baseY, p1.y);
+                    Vector3 v2 = new Vector3(p2.x, baseY, p2.y);
+                    
+                    // Top vertices
+                    Vector3 v3 = new Vector3(p2.x, baseY + outOfBoundsHeight, p2.y);
+                    Vector3 v4 = new Vector3(p1.x, baseY + outOfBoundsHeight, p1.y);
+                    
+                    // Add vertices
+                    int baseIndex = vertices.Count;
+                    vertices.Add(v1);
+                    vertices.Add(v2);
+                    vertices.Add(v3);
+                    vertices.Add(v4);
+                    
+                    // Add triangles (two triangles per quad)
+                    // First triangle: v1, v2, v3
+                    triangles.Add(baseIndex);
+                    triangles.Add(baseIndex + 1);
+                    triangles.Add(baseIndex + 2);
+                    
+                    // Second triangle: v1, v3, v4
+                    triangles.Add(baseIndex);
+                    triangles.Add(baseIndex + 2);
+                    triangles.Add(baseIndex + 3);
+                }
+            }
+            
+            if (vertices.Count == 0)
+                return null;
+            
+            // Create mesh
+            Mesh mesh = new Mesh();
+            mesh.name = "OutOfBoundsCollisionMesh";
+            mesh.vertices = vertices.ToArray();
+            mesh.triangles = triangles.ToArray();
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            
+            return mesh;
+        }
+        
+        /// <summary>
+        /// Destroys the out of bounds collider GameObject
+        /// </summary>
+        private void DestroyOutOfBoundsCollider()
+        {
+            if (outOfBoundsCollider != null)
+            {
+                if (Application.isPlaying)
+                {
+                    Destroy(outOfBoundsCollider);
+                }
+                else
+                {
+#if UNITY_EDITOR
+                    DestroyImmediate(outOfBoundsCollider);
+#else
+                    Destroy(outOfBoundsCollider);
+#endif
+                }
+                outOfBoundsCollider = null;
+            }
         }
     }
 }
