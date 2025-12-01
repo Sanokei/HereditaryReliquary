@@ -8,6 +8,7 @@ using Unity.Cinemachine;
 using UnityEngine.Rendering;
 using CW.Common;
 using Lean.Transition;
+using EasyTransition;
 
 public class MenuCameraController : MonoBehaviour
 {
@@ -16,10 +17,13 @@ public class MenuCameraController : MonoBehaviour
     [SerializeField] CinemachineCamera _VideoStart;
     [SerializeField] Volume _VideoStartVolume;
     [SerializeField] GameObject _VideoStartFocusObject;
+    [SerializeField] GameObject _OutsideOfTVObject;
+    [SerializeField] GameObject _DogViewObject;
+    [SerializeField] GameObject _CatViewObject;
     [SerializeField] Camera _MainCamera;
+    [SerializeField] TransitionSettings transition;
     // [SerializeField] VideoPlayer _BubbleTransition;
 
-    string _QueuedSceneName;
     void Start()
     {
         CinemachineCameraManager.Instance.SetCam(_Start);
@@ -28,13 +32,46 @@ public class MenuCameraController : MonoBehaviour
     {
         _Start.Priority = 0;
         _VideoStart.Priority = 1;
-        _QueuedSceneName = sceneName;
+        _VideoStartVolume.weight = 1;
+        _StartVolume.weight = 0;
         
+        SubtitleManager.Instance.SetSubtitles("The wave shrines were once a place of pilgrimage");
         _VideoStart.transform
-                .positionTransition_y(-20.739f, 1.25f, LeanEase.Smooth).JoinTransition().EventTransition(()=>{
+            .positionTransition_y(-20.739f, 3.25f, LeanEase.Smooth).JoinTransition().EventTransition(()=>{
+                SubtitleManager.Instance.SetSubtitles("Two centuries ago the most respected shrine by sailors and merchant marines");
                 _VideoStart.transform.SetPositionAndRotation(_VideoStartFocusObject.transform.position,_VideoStartFocusObject.transform.rotation);
-            }).JoinTransition()
-                .positionTransition_xy(new(_VideoStartFocusObject.transform.position.x + 1.5f, _VideoStartFocusObject.transform.position.y + 1f), 0.5f, LeanEase.Smooth);
+            }).JoinDelayTransition(2.75f).EventTransition(()=>{
+                SubtitleManager.Instance.SetSubtitles("Legends say that those who visit the shrine will be blessed with safe travels");
+                _VideoStart.transform.positionTransition_xy(new(_VideoStart.transform.position.x + 1.5f, _VideoStart.transform.position.y + 1f), 2.5f, LeanEase.Smooth)
+                    .JoinTransition().EventTransition(()=>{
+                        _VideoStart.transform.positionTransition(_OutsideOfTVObject.transform.position, 1.25f, LeanEase.Smooth);
+                        _VideoStart.transform.rotationTransition(_OutsideOfTVObject.transform.rotation, 1.25f, LeanEase.Smooth);
+                        SubtitleManager.Instance.SetSubtitles("But now, it can be yours for only $19.99!");
+                        _StartVolume.weight = 1;
+                        _VideoStartVolume.weight = 0;
+                    }).JoinDelayTransition(1.75f).EventTransition(()=>{
+                        SubtitleManager.Instance.SetSubtitles("That's right only 3 easy payments of $19.99!");
+                        _VideoStart.transform.positionTransition_x(_VideoStart.transform.position.x + 10f, 2.25f, LeanEase.Smooth).JoinTransition()
+                            .rotationTransition(Quaternion.Euler(_VideoStart.transform.rotation.eulerAngles + new Vector3(0f, 180f, 0f)), 0.75f, LeanEase.Smooth)
+                            .JoinDelayTransition(0.75f).EventTransition(()=>{
+                                SubtitleManager.Instance.SetSubtitles("Dog: What a scam, those wave shrines are way cool, and can't be sold to the highest bidder");
+                                _VideoStart.transform.SetPositionAndRotation(_DogViewObject.transform.position, _DogViewObject.transform.rotation);
+                            }).JoinDelayTransition(2.75f).EventTransition(()=>{
+                                SubtitleManager.Instance.SetSubtitles("Cat: miao");
+                                _VideoStart.transform.SetPositionAndRotation(_CatViewObject.transform.position, _CatViewObject.transform.rotation);
+                            }).JoinDelayTransition(1.75f).EventTransition(()=>{
+                                SubtitleManager.Instance.SetSubtitles("Being decerped and creepy now is not very in fashion");
+                                _VideoStart.transform.SetPositionAndRotation(_OutsideOfTVObject.transform.position,_OutsideOfTVObject.transform.rotation);
+                            }).JoinDelayTransition(2.0f).EventTransition(()=>{
+                                SubtitleManager.Instance.SetSubtitles("Dog: Cat lets go on an adventure");
+                                _VideoStart.transform.SetPositionAndRotation(_DogViewObject.transform.position, _DogViewObject.transform.rotation);
+                            }).JoinDelayTransition(2.75f).EventTransition(()=>{
+                                SubtitleManager.Instance.SetSubtitles("Cat: miao");
+                                _VideoStart.transform.SetPositionAndRotation(_CatViewObject.transform.position, _CatViewObject.transform.rotation);
+                                TransitionManager.Instance().Transition(sceneName, transition, 1.75f);
+                            });
+                    });
+            });
         // this.Delay(4f,() =>
         // {
         //     _BubbleTransition.Play();
