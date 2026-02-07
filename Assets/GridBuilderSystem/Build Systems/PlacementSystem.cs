@@ -83,7 +83,23 @@ namespace GridBuilder.Core
             
             if (activeGridContainers.Count == 0)
             {
-                Debug.LogError($"No spline grid container found for database with layer mask \"{LayerMask.LayerToName(targetDatabase.placementLayermask.value)}\".\n Does the database have a layer mask set?");
+                // Convert layer mask value to layer index for display
+                string layerName = "None";
+                int layerMaskValue = targetDatabase.placementLayermask.value;
+                if (layerMaskValue != 0)
+                {
+                    // Find the first set bit (layer index)
+                    for (int i = 0; i < 32; i++)
+                    {
+                        if ((layerMaskValue & (1 << i)) != 0)
+                        {
+                            layerName = LayerMask.LayerToName(i);
+                            break;
+                        }
+                    }
+                }
+                
+                Debug.LogError($"No spline grid container found for database with layer mask \"{layerName}\" (value: {layerMaskValue}).\n Does the database have a layer mask set?");
                 return;
             }
             

@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f08eccf2ba25e4c438858aa61f869bc8, type: 3}
+  m_Name: Level_1
+  m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.LevelData
+  levelName: Level 0
+  par: 2
+  gridCellSize: 1
+  gridSize: {x: 10, y: 10}
+  splineBoundaryPoints:
+  - {x: -5, y: -5}
+  - {x: 5, y: -5}
+  - {x: 5, y: 5}
+  - {x: -5, y: 5}
+  - {x: -35.09785, y: -0.22691464}
+  - {x: -33.09785, y: -18.53897}
+  playerSpawnCell: {x: 3, y: 0, z: -1}
+  goalCell: {x: -31, y: 0, z: -9}
+  gridMaterial: {fileID: 2100000, guid: 29f5a41931bdf4fa0852fa968e1fd614, type: 2}
+  placementLayerMask:
+    serializedVersion: 2
+    m_Bits: 64
+  ringPrefab: {fileID: 1869539175963192084, guid: af63b5fbdd8c3e749a6d4f39b210ff3b, type: 3}
+  autoCreateRing: 1
+  hazards:
+  - type: 0
+    position: {x: -2.5, y: -1.5}
+    rotation: 0
+    scale: 1
+    customProperties: 
+  - type: 0
+    position: {x: -3.5, y: -1.5}
+    rotation: 0
+    scale: 1
+    customProperties: 
+  - type: 0
+    position: {x: -5.5, y: -0.5}
+    rotation: 0
+    scale: 1
+    customProperties: 
+  - type: 0
+    position: {x: -6.5, y: 1.5}
+    rotation: 0
+    scale: 1
+    customProperties: 
+  rockPrefab: {fileID: 3757235221510546488, guid: d7cbedb1ce33c4d4daa221079366a3a8, type: 3}
+  sandtrapPrefab: {fileID: 7224661186786454736, guid: 1c9d689780dcd5144969b3aee966ee7b, type: 3}
+  whirlpoolPrefab: {fileID: 0}
+  currentPrefab: {fileID: 0}

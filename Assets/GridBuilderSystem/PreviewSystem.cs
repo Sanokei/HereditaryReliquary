@@ -273,6 +273,9 @@ namespace GridBuilder.Core
             // This helps distinguish preview from placed objects
             previewObject.transform.localScale = previewObject.transform.localScale * 1.01f;
             
+            // Disable gameplay-affecting components so preview doesn't have gameplay effects
+            DisableGameplayComponents(previewObject);
+            
             Renderer[] renderers = previewObject.GetComponentsInChildren<Renderer>();
             foreach (Renderer renderer in renderers)
             {
@@ -282,6 +285,34 @@ namespace GridBuilder.Core
                     materials[i] = previewMaterialInstance;
                 }
                 renderer.sharedMaterials = materials;
+            }
+        }
+        
+        /// <summary>
+        /// Disables components that have gameplay effects so preview objects don't affect gameplay
+        /// </summary>
+        private void DisableGameplayComponents(GameObject obj)
+        {
+            // Disable Wave components (they push boats)
+            Wave[] waveComponents = obj.GetComponentsInChildren<Wave>();
+            foreach (Wave wave in waveComponents)
+            {
+                wave.enabled = false;
+            }
+            
+            // Disable ALL colliders (both trigger and non-trigger) to prevent physics interactions
+            Collider[] colliders = obj.GetComponentsInChildren<Collider>();
+            foreach (Collider collider in colliders)
+            {
+                collider.enabled = false;
+            }
+            
+            // Disable Rigidbody components (they interact with physics)
+            Rigidbody[] rigidbodies = obj.GetComponentsInChildren<Rigidbody>();
+            foreach (Rigidbody rb in rigidbodies)
+            {
+                rb.isKinematic = true;
+                rb.detectCollisions = false;
             }
         }
 

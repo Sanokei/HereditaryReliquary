@@ -18,6 +18,13 @@ namespace GridBuilder.Core
         [SerializeField] private LayerMask placementLayerMask;
         [SerializeField] private CellSizePlacementMode placementMode = CellSizePlacementMode.ConvertCells;
         
+        [Header("Outside Ring Settings")]
+        [SerializeField] private GameObject ringPrefab;
+        [SerializeField] private Transform ringParent;
+        [SerializeField] private Vector3 ringPositionOffset = Vector3.zero;
+        [SerializeField] private bool autoCreateRingOnStart = false;
+        [SerializeField] private bool clearExistingRingOnCreate = true;
+        
         private Grid grid;
         private GameObject gridVisualization;
         private MeshFilter meshFilter;
@@ -32,6 +39,19 @@ namespace GridBuilder.Core
         public int GridCellSize => gridCellSize;
         public CellSizePlacementMode PlacementMode => placementMode;
         
+        /// <summary>
+        /// Initializes the SplineGridContainer with custom settings (call this before Awake or after component creation)
+        /// </summary>
+        public void InitializeSettings(int cellSize, Vector2 size, Material material, LayerMask layerMask, GameObject ringPrefab = null, bool autoCreateRing = false)
+        {
+            gridCellSize = cellSize;
+            gridSize = size;
+            gridMaterial = material;
+            placementLayerMask = layerMask;
+            this.ringPrefab = ringPrefab;
+            autoCreateRingOnStart = autoCreateRing;
+        }
+        
         private void Awake()
         {
             // Get SplineContainer component from the same GameObject
@@ -42,6 +62,15 @@ namespace GridBuilder.Core
             UpdateSplineFromGridSize();
             InitializeGrid();
             GenerateGridVisualization();
+        }
+        
+        private void Start()
+        {
+            // Auto-create ring if enabled
+            if (autoCreateRingOnStart && ringPrefab != null)
+            {
+                CreateOutsideRing(ringPrefab, ringParent, ringPositionOffset, clearExistingRingOnCreate);
+            }
         }
         
         private void InitializeGrid()
@@ -338,6 +367,130 @@ namespace GridBuilder.Core
         }
         
         /// <summary>
+        /// Registers an island GameObject to occupy grid cells so objects can't be placed on it
+        /// </summary>
+        /// <param name="island">The island GameObject to register</param>
+        /// <returns>True if the island was successfully registered, false otherwise</returns>
+        public bool RegisterIsland(GameObject island)
+        {
+            if (island == null || grid == null || gridData == null)
+                return false;
+            
+            // Check if island is within this container's boundary
+            if (!IsPositionWithinBoundary(island.transform.position))
+            {
+                Debug.LogWarning($"SplineGridContainer: Island at {island.transform.position} is not within grid boundary", this);
+                return false;
+            }
+            
+            // Calculate occupied cells from island bounds
+            List<Vector3Int> occupiedCells = CalculateOccupiedCellsFromBounds(island);
+            
+            if (occupiedCells.Count == 0)
+            {
+                // Fallback: at least register the cell the island is positioned at
+                Vector3Int islandCell = grid.WorldToCell(island.transform.position);
+                occupiedCells.Add(new Vector3Int(islandCell.x, 0, islandCell.z));
+            }
+            
+            // Use the first cell as the origin position
+            Vector3Int originCell = occupiedCells[0];
+            
+            // Calculate relative cells from origin
+            List<Vector3Int> relativeCells = new List<Vector3Int>();
+            foreach (var cell in occupiedCells)
+            {
+                relativeCells.Add(cell - originCell);
+            }
+            
+            // Use special ID for island (-2) to distinguish it from other objects
+            // Use -1 as placedObjectIndex since it's not in ObjectPlacer
+            const int islandObjectID = -2;
+            const int islandPlacedObjectIndex = -1;
+            
+            try
+            {
+                gridData.AddObjectAt(originCell, relativeCells, islandObjectID, islandPlacedObjectIndex);
+                Debug.Log($"SplineGridContainer: Registered island '{island.name}' to grid data at {occupiedCells.Count} cells (origin: {originCell})", this);
+                return true;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"SplineGridContainer: Could not register island to grid data: {e.Message}", this);
+                return false;
+            }
+        }
+        
+        /// <summary>
+        /// Calculates occupied grid cells from a GameObject's bounds
+        /// </summary>
+        private List<Vector3Int> CalculateOccupiedCellsFromBounds(GameObject obj)
+        {
+            if (obj == null || grid == null)
+                return new List<Vector3Int>();
+            
+            // Get all renderers for accurate bounds
+            Renderer[] renderers = obj.GetComponentsInChildren<Renderer>();
+            Bounds bounds;
+            
+            if (renderers.Length > 0)
+            {
+                bounds = renderers[0].bounds;
+                for (int i = 1; i < renderers.Length; i++)
+                {
+                    bounds.Encapsulate(renderers[i].bounds);
+                }
+            }
+            else
+            {
+                // Fallback: try colliders
+                Collider[] colliders = obj.GetComponentsInChildren<Collider>();
+                if (colliders.Length > 0)
+                {
+                    bounds = colliders[0].bounds;
+                    for (int i = 1; i < colliders.Length; i++)
+                    {
+                        bounds.Encapsulate(colliders[i].bounds);
+                    }
+                }
+                else
+                {
+                    // Final fallback: use position with default size
+                    bounds = new Bounds(obj.transform.position, Vector3.one);
+                }
+            }
+            
+            List<Vector3Int> occupiedCells = new List<Vector3Int>();
+            
+            // Get the bounds corners and find all cells within
+            Vector3 min = bounds.min;
+            Vector3 max = bounds.max;
+            
+            // Convert world bounds to grid cells
+            Vector3Int minCell = grid.WorldToCell(min);
+            Vector3Int maxCell = grid.WorldToCell(max);
+            
+            // Add all cells within the bounds
+            for (int x = minCell.x; x <= maxCell.x; x++)
+            {
+                for (int z = minCell.z; z <= maxCell.z; z++)
+                {
+                    Vector3Int cellPos = new Vector3Int(x, 0, z);
+                    Vector3 cellCenter = grid.GetCellCenterWorld(cellPos);
+                    
+                    // Check if cell center is within bounds (XZ plane)
+                    if (cellCenter.x >= min.x && cellCenter.x <= max.x &&
+                        cellCenter.z >= min.z && cellCenter.z <= max.z)
+                    {
+                        occupiedCells.Add(cellPos);
+                    }
+                }
+            }
+            
+            return occupiedCells;
+        }
+        
+        /// <summary>
         /// Gets the layer index from a LayerMask (returns the first set bit)
         /// </summary>
         private int GetLayerFromLayerMask(LayerMask layerMask)
@@ -488,6 +641,311 @@ namespace GridBuilder.Core
                 return new List<PlacementData>();
             
             return gridData.GetAllPlacementData();
+        }
+        
+        /// <summary>
+        /// Creates a ring of prefabs around the outside of the grid boundary (one cell outside).
+        /// The ring consists of cells that are exactly one cell outside the grid's boundary.
+        /// </summary>
+        /// <param name="ringPrefab">The prefab to instantiate at each ring cell position</param>
+        /// <param name="parent">Optional parent transform for the ring objects. If null, uses this transform.</param>
+        /// <param name="positionOffset">Optional offset to apply to each ring object's position</param>
+        /// <param name="clearExisting">If true, clears existing ring objects with the naming prefix before creating new ones</param>
+        /// <returns>List of created GameObjects, or empty list if creation failed</returns>
+        public List<GameObject> CreateOutsideRing(GameObject ringPrefab, Transform parent = null, Vector3 positionOffset = default, bool clearExisting = true)
+        {
+            List<GameObject> createdObjects = new List<GameObject>();
+            
+            if (ringPrefab == null)
+            {
+                Debug.LogError("SplineGridContainer: Cannot create ring - ringPrefab is null.", this);
+                return createdObjects;
+            }
+            
+            if (grid == null)
+            {
+                Debug.LogError("SplineGridContainer: Cannot create ring - grid is not initialized.", this);
+                return createdObjects;
+            }
+            
+            // Determine parent
+            Transform targetParent = parent != null ? parent : transform;
+            
+            // Clear existing ring objects if requested
+            if (clearExisting)
+            {
+                ClearExistingRingObjects(targetParent);
+            }
+            
+            // Calculate ring cells
+            List<Vector3Int> ringCells = CalculateRingCells();
+            
+            if (ringCells.Count == 0)
+            {
+                Debug.LogWarning("SplineGridContainer: No ring cells found. The grid may be too small.", this);
+                return createdObjects;
+            }
+            
+            // Instantiate prefabs at each ring cell
+            foreach (Vector3Int cellPosition in ringCells)
+            {
+                Vector3 worldPosition = grid.GetCellCenterWorld(cellPosition);
+                // Set Y to ground level (0) so objects sit on the ground, then apply offset
+                worldPosition.y = 0f;
+                worldPosition += positionOffset;
+                
+                GameObject instance;
+                #if UNITY_EDITOR
+                // In edit mode, use PrefabUtility to maintain prefab connections
+                if (!Application.isPlaying)
+                {
+                    instance = UnityEditor.PrefabUtility.InstantiatePrefab(ringPrefab, targetParent) as GameObject;
+                    if (instance != null)
+                    {
+                        instance.transform.position = worldPosition;
+                        instance.transform.rotation = Quaternion.identity;
+                    }
+                }
+                else
+                {
+                    instance = Instantiate(ringPrefab, worldPosition, Quaternion.identity, targetParent);
+                }
+                #else
+                instance = Instantiate(ringPrefab, worldPosition, Quaternion.identity, targetParent);
+                #endif
+                
+                if (instance != null)
+                {
+                    instance.name = $"RingObject_{cellPosition.x}_{cellPosition.y}_{cellPosition.z}";
+                    createdObjects.Add(instance);
+                }
+            }
+            
+            if (createdObjects.Count > 0)
+            {
+                Debug.Log($"SplineGridContainer: Created {createdObjects.Count} ring objects around the grid.", this);
+            }
+            
+            return createdObjects;
+        }
+        
+        /// <summary>
+        /// Calculates the cells that form a ring one cell outside the grid boundary.
+        /// For a 2D grid (XZ plane), this creates a perimeter ring.
+        /// The method samples cells around the expanded boundary and filters to only include
+        /// cells that are outside the spline boundary.
+        /// </summary>
+        private List<Vector3Int> CalculateRingCells()
+        {
+            HashSet<Vector3Int> ringCellsSet = new HashSet<Vector3Int>();
+            
+            if (grid == null)
+                return new List<Vector3Int>();
+            
+            // Get the boundary polygon to determine the approximate grid bounds
+            List<Vector2> boundaryPolygon = GetBoundaryPolygon();
+            if (boundaryPolygon.Count < 3)
+            {
+                // Fallback: use gridSize to calculate bounds
+                return CalculateRingCellsFromGridSize();
+            }
+            
+            // Find the bounding box of the boundary polygon
+            float minX = float.MaxValue, maxX = float.MinValue;
+            float minZ = float.MaxValue, maxZ = float.MinValue;
+            
+            foreach (Vector2 point in boundaryPolygon)
+            {
+                minX = Mathf.Min(minX, point.x);
+                maxX = Mathf.Max(maxX, point.x);
+                minZ = Mathf.Min(minZ, point.y);
+                maxZ = Mathf.Max(maxZ, point.y);
+            }
+            
+            // Convert world bounds to grid cell coordinates
+            // We need to find cells that are exactly one cell outside the boundary
+            // First, find the actual boundary edge by sampling cells
+            Vector3Int minCell = new Vector3Int(int.MaxValue, 0, int.MaxValue);
+            Vector3Int maxCell = new Vector3Int(int.MinValue, 0, int.MinValue);
+            
+            // Sample points along the boundary to find the actual cell bounds
+            for (int i = 0; i < boundaryPolygon.Count; i++)
+            {
+                Vector2 point = boundaryPolygon[i];
+                Vector3 worldPos = new Vector3(point.x, transform.position.y, point.y);
+                Vector3Int cell = grid.WorldToCell(worldPos);
+                
+                minCell.x = Mathf.Min(minCell.x, cell.x);
+                minCell.z = Mathf.Min(minCell.z, cell.z);
+                maxCell.x = Mathf.Max(maxCell.x, cell.x);
+                maxCell.z = Mathf.Max(maxCell.z, cell.z);
+            }
+            
+            // The ring should be exactly one cell outside the boundary edge
+            // minCell and maxCell already represent the boundary edge cells
+            // So we go one cell outside on the negative side, but maxCell is already at the edge
+            int ringMinX = minCell.x - 1;
+            int ringMaxX = maxCell.x;  // Don't add 1, maxCell is already at the outer edge
+            int ringMinZ = minCell.z - 1;
+            int ringMaxZ = maxCell.z;  // Don't add 1, maxCell is already at the outer edge
+            
+            // For a 2D grid (XZ plane), we create a ring on the perimeter
+            // Top and bottom edges (constant Z) - these are one cell outside
+            for (int x = ringMinX; x <= ringMaxX; x++)
+            {
+                // Bottom edge (zMin) - one cell below the boundary
+                Vector3Int bottomCell = new Vector3Int(x, 0, ringMinZ);
+                if (IsCellOutsideBoundary(bottomCell))
+                {
+                    ringCellsSet.Add(bottomCell);
+                }
+                
+                // Top edge (zMax) - one cell above the boundary
+                Vector3Int topCell = new Vector3Int(x, 0, ringMaxZ);
+                if (IsCellOutsideBoundary(topCell))
+                {
+                    ringCellsSet.Add(topCell);
+                }
+            }
+            
+            // Left and right edges (constant X) - skip corners to avoid duplicates
+            for (int z = ringMinZ + 1; z < ringMaxZ; z++)
+            {
+                // Left edge (xMin) - one cell to the left of the boundary
+                Vector3Int leftCell = new Vector3Int(ringMinX, 0, z);
+                if (IsCellOutsideBoundary(leftCell))
+                {
+                    ringCellsSet.Add(leftCell);
+                }
+                
+                // Right edge (xMax) - one cell to the right of the boundary
+                Vector3Int rightCell = new Vector3Int(ringMaxX, 0, z);
+                if (IsCellOutsideBoundary(rightCell))
+                {
+                    ringCellsSet.Add(rightCell);
+                }
+            }
+            
+            return new List<Vector3Int>(ringCellsSet);
+        }
+        
+        /// <summary>
+        /// Fallback method to calculate ring cells using gridSize when boundary polygon is not available.
+        /// </summary>
+        private List<Vector3Int> CalculateRingCellsFromGridSize()
+        {
+            HashSet<Vector3Int> ringCellsSet = new HashSet<Vector3Int>();
+            
+            if (grid == null)
+                return new List<Vector3Int>();
+            
+            // Calculate grid bounds in cell coordinates
+            // gridSize represents the number of cells in X and Z dimensions
+            int gridWidth = Mathf.RoundToInt(gridSize.x);
+            int gridHeight = Mathf.RoundToInt(gridSize.y);
+            
+            // Calculate the bounds of the grid (centered at origin in grid space)
+            int halfWidth = gridWidth / 2;
+            int halfHeight = gridHeight / 2;
+            
+            // The ring should be exactly one cell outside the grid boundary
+            // Grid goes from -halfWidth to +halfWidth (approximately), so ring is at -halfWidth-1 and +halfWidth
+            int ringMinX = -halfWidth - 1;
+            int ringMaxX = halfWidth;
+            int ringMinZ = -halfHeight - 1;
+            int ringMaxZ = halfHeight;
+            
+            // For a 2D grid (XZ plane), we create a ring on the perimeter
+            // Top and bottom edges (constant Z)
+            for (int x = ringMinX; x <= ringMaxX; x++)
+            {
+                // Bottom edge (zMin) - one cell below the grid
+                Vector3Int bottomCell = new Vector3Int(x, 0, ringMinZ);
+                if (IsCellOutsideBoundary(bottomCell))
+                {
+                    ringCellsSet.Add(bottomCell);
+                }
+                
+                // Top edge (zMax) - one cell above the grid
+                Vector3Int topCell = new Vector3Int(x, 0, ringMaxZ);
+                if (IsCellOutsideBoundary(topCell))
+                {
+                    ringCellsSet.Add(topCell);
+                }
+            }
+            
+            // Left and right edges (constant X) - skip corners to avoid duplicates
+            for (int z = ringMinZ + 1; z < ringMaxZ; z++)
+            {
+                // Left edge (xMin) - one cell to the left of the grid
+                Vector3Int leftCell = new Vector3Int(ringMinX, 0, z);
+                if (IsCellOutsideBoundary(leftCell))
+                {
+                    ringCellsSet.Add(leftCell);
+                }
+                
+                // Right edge (xMax) - one cell to the right of the grid
+                Vector3Int rightCell = new Vector3Int(ringMaxX, 0, z);
+                if (IsCellOutsideBoundary(rightCell))
+                {
+                    ringCellsSet.Add(rightCell);
+                }
+            }
+            
+            return new List<Vector3Int>(ringCellsSet);
+        }
+        
+        /// <summary>
+        /// Checks if a cell position is outside the spline boundary.
+        /// For the ring, we want cells that are outside the boundary.
+        /// </summary>
+        private bool IsCellOutsideBoundary(Vector3Int cellPosition)
+        {
+            if (grid == null)
+                return false;
+            
+            Vector3 worldPosition = grid.GetCellCenterWorld(cellPosition);
+            return !IsPositionWithinBoundary(worldPosition);
+        }
+        
+        /// <summary>
+        /// Clears existing ring objects that were created by CreateOutsideRing.
+        /// </summary>
+        private void ClearExistingRingObjects(Transform parent)
+        {
+            List<GameObject> toDestroy = new List<GameObject>();
+            const string RING_OBJECT_NAME_PREFIX = "RingObject_";
+            
+            // Find all children with the ring object name prefix
+            foreach (Transform child in parent)
+            {
+                if (child.name.StartsWith(RING_OBJECT_NAME_PREFIX))
+                {
+                    toDestroy.Add(child.gameObject);
+                }
+            }
+            
+            // Destroy found objects (use DestroyImmediate in edit mode)
+            foreach (GameObject obj in toDestroy)
+            {
+                #if UNITY_EDITOR
+                if (!Application.isPlaying)
+                {
+                    DestroyImmediate(obj);
+                }
+                else
+                {
+                    Destroy(obj);
+                }
+                #else
+                Destroy(obj);
+                #endif
+            }
+            
+            if (toDestroy.Count > 0)
+            {
+                Debug.Log($"SplineGridContainer: Cleared {toDestroy.Count} existing ring objects.", this);
+            }
         }
     }
 }

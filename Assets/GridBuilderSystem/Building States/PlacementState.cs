@@ -35,6 +35,11 @@ namespace GridBuilder.Core
         private float cachedRotation = float.NaN;
         private Vector3 cachedCenterOffset = Vector3.zero;
         private bool centerOffsetDirty = true;
+        
+        // Cooldown system for wave placement
+        private float lastPlacementTime = -1f;
+        private float cooldownDuration = 2f; // Default 2 seconds, can be configured per object
+        private bool isOnCooldown = false;
 
         public PlacementState(int iD,
                             Grid grid,
@@ -115,6 +120,13 @@ namespace GridBuilder.Core
                 gridData = currentContainer.GridData;
             }
 
+            // Check cooldown for wave placement
+            if (IsWavePlacement() && IsOnCooldown())
+            {
+                soundFeedback.PlaySound(SoundType.WrongPlacement);
+                return;
+            }
+
             PlacementGeometry geometry;
             bool placementValidity = CheckPlacementValidity(gridPosition, selectedObjectIndex, out geometry);
             if (placementValidity == false)
@@ -122,7 +134,20 @@ namespace GridBuilder.Core
                 soundFeedback.PlaySound(SoundType.WrongPlacement);
                 return;
             }
+            
+            // Place the object
             soundFeedback.PlaySound(SoundType.Place);
+            
+            // Start cooldown if this is a wave placement
+            if (IsWavePlacement())
+            {
+                StartCooldown();
+                // Increment par count in LevelManager
+                if (LevelManager.Instance != null)
+                {
+                    LevelManager.Instance.IncrementPar();
+                }
+            }
             
             // Calculate placement position - use the center of all occupied cells for correct multi-cell centering
             // This ensures the object is placed centered on all its occupied cells, not just the origin cell
@@ -153,7 +178,6 @@ namespace GridBuilder.Core
             // Calculate the object's bounds to ensure it doesn't clip through the floor
             // Get bounds from prefab's mesh filters without instantiating
             MeshFilter[] meshFilters = prefab.GetComponentsInChildren<MeshFilter>();
-            float bottomOffset = 0f;
             
             if (meshFilters.Length > 0)
             {
@@ -316,6 +340,18 @@ namespace GridBuilder.Core
             // Get rotated cells for validity check
             List<Vector3Int> rotatedCells = RotateOccupiedCells(occupiedCells, currentRotation);
             
+            // Check if placing on boat (for all objects, not just waves) - check BEFORE standard checks
+            if (WouldOverlapWithBoat(geometry.Origin, rotatedCells))
+            {
+                return false;
+            }
+            
+            // Check if placing on island (for all objects) - check BEFORE standard checks
+            if (WouldOverlapWithIsland(geometry.Origin, rotatedCells))
+            {
+                return false;
+            }
+            
             // First, do standard placement checks (collision, boundaries, etc.)
             bool standardCheckPassed = false;
             if (splineGridContainers != null && splineGridContainers.Count > 0)
@@ -418,6 +454,7 @@ namespace GridBuilder.Core
                 {
                     // Convert world position to this container's grid space
                     Vector3Int containerCellPos = container.Grid.WorldToCell(worldPos);
+                    // Check if cell is occupied (this includes boat and island)
                     if (container.GridData.HasObjectAt(containerCellPos))
                     {
                         return false;
@@ -746,6 +783,227 @@ namespace GridBuilder.Core
             }
             
             return rotatedCells;
+        }
+        
+        /// <summary>
+        /// Checks if the current object being placed is a wave (has Wave component)
+        /// </summary>
+        private bool IsWavePlacement()
+        {
+            if (selectedObjectIndex < 0 || selectedObjectIndex >= database.objectsData.Count)
+                return false;
+            
+            GameObject prefab = database.objectsData[selectedObjectIndex].Prefab;
+            if (prefab == null)
+                return false;
+            
+            // Check if prefab or any child has Wave component
+            return prefab.GetComponent<Wave>() != null || prefab.GetComponentInChildren<Wave>() != null;
+        }
+        
+        /// <summary>
+        /// Checks if placement is currently on cooldown
+        /// </summary>
+        private bool IsOnCooldown()
+        {
+            if (!isOnCooldown)
+                return false;
+            
+            // Check if cooldown has expired
+            if (Time.time - lastPlacementTime >= cooldownDuration)
+            {
+                isOnCooldown = false;
+                return false;
+            }
+            
+            return true;
+        }
+        
+        /// <summary>
+        /// Starts the cooldown timer after placing a wave
+        /// </summary>
+        private void StartCooldown()
+        {
+            lastPlacementTime = Time.time;
+            isOnCooldown = true;
+            
+            // Get cooldown duration from Wave component if available
+            GameObject prefab = database.objectsData[selectedObjectIndex].Prefab;
+            if (prefab != null)
+            {
+                Wave wave = prefab.GetComponent<Wave>();
+                if (wave == null)
+                    wave = prefab.GetComponentInChildren<Wave>();
+                
+                // Note: Wave lifetime is not the same as cooldown, but we could use it
+                // For now, use default cooldown. Can be extended to have a cooldown field in Wave
+            }
+        }
+        
+        /// <summary>
+        /// Gets the remaining cooldown time (0 if not on cooldown)
+        /// </summary>
+        public float GetRemainingCooldown()
+        {
+            if (!isOnCooldown)
+                return 0f;
+            
+            float remaining = cooldownDuration - (Time.time - lastPlacementTime);
+            return Mathf.Max(0f, remaining);
+        }
+        
+        /// <summary>
+        /// Sets the cooldown duration for wave placement
+        /// </summary>
+        public void SetCooldownDuration(float duration)
+        {
+            cooldownDuration = Mathf.Max(0f, duration);
+        }
+        
+        /// <summary>
+        /// Checks if the placement would overlap with the boat's current position
+        /// </summary>
+        private bool WouldOverlapWithBoat(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
+        {
+            // Find BoatGridTracker in the scene
+            BoatGridTracker boatTracker = Object.FindFirstObjectByType<BoatGridTracker>();
+            if (boatTracker == null)
+            {
+                // No boat tracker found, assume no boat to check
+                return false;
+            }
+            
+            // Check overlap with boat in current container
+            if (currentContainer != null)
+            {
+                if (boatTracker.WouldOverlapWithBoat(currentContainer, gridPosition, occupiedCells))
+                {
+                    return true;
+                }
+            }
+            
+            // Check overlap with boat in all containers if using multi-container placement
+            if (splineGridContainers != null && splineGridContainers.Count > 0)
+            {
+                foreach (var container in splineGridContainers)
+                {
+                    if (container != null && container.Grid != null)
+                    {
+                        // Convert grid position to this container's grid space
+                        Vector3 worldPos = grid.GetCellCenterWorld(gridPosition);
+                        Vector3Int containerGridPos = container.Grid.WorldToCell(worldPos);
+                        
+                        // Calculate relative cells in container's grid space
+                        List<Vector3Int> containerOccupiedCells = new List<Vector3Int>();
+                        foreach (var cell in occupiedCells)
+                        {
+                            Vector3 cellWorldPos = grid.GetCellCenterWorld(gridPosition + cell);
+                            Vector3Int containerCell = container.Grid.WorldToCell(cellWorldPos);
+                            containerOccupiedCells.Add(containerCell - containerGridPos);
+                        }
+                        
+                        if (boatTracker.WouldOverlapWithBoat(container, containerGridPos, containerOccupiedCells))
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+            
+            return false;
+        }
+        
+        /// <summary>
+        /// Checks if the placement would overlap with the island's position
+        /// </summary>
+        private bool WouldOverlapWithIsland(Vector3Int gridPosition, List<Vector3Int> occupiedCells)
+        {
+            // Island uses special ID -2 in grid data
+            const int islandObjectID = -2;
+            
+            // Check overlap with island in current container
+            if (currentContainer != null && currentContainer.GridData != null)
+            {
+                List<Vector3Int> positionToOccupy = new List<Vector3Int>();
+                foreach (var cell in occupiedCells)
+                {
+                    positionToOccupy.Add(gridPosition + cell);
+                }
+                
+                // Check if any of these cells contain the island (by ID or by HasObjectAt)
+                foreach (var pos in positionToOccupy)
+                {
+                    // Check by ID first
+                    if (currentContainer.GridData.GetObjectIDAt(pos) == islandObjectID)
+                    {
+                        return true;
+                    }
+                    // Also check if cell is occupied (in case island was added differently)
+                    if (currentContainer.GridData.HasObjectAt(pos))
+                    {
+                        // Double-check it's the island by checking if it's not a regular object
+                        int id = currentContainer.GridData.GetObjectIDAt(pos);
+                        if (id == islandObjectID || id < 0) // Negative IDs are special objects
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+            
+            // Check overlap with island in all containers if using multi-container placement
+            if (splineGridContainers != null && splineGridContainers.Count > 0)
+            {
+                Grid referenceGrid = grid != null ? grid : (currentContainer != null ? currentContainer.Grid : null);
+                if (referenceGrid == null && splineGridContainers.Count > 0)
+                {
+                    referenceGrid = splineGridContainers[0].Grid;
+                }
+                
+                if (referenceGrid != null)
+                {
+                    foreach (var container in splineGridContainers)
+                    {
+                        if (container != null && container.Grid != null && container.GridData != null)
+                        {
+                            // Convert grid position to this container's grid space
+                            Vector3 worldPos = referenceGrid.GetCellCenterWorld(gridPosition);
+                            Vector3Int containerGridPos = container.Grid.WorldToCell(worldPos);
+                            
+                            // Calculate cells the object would occupy in this container
+                            List<Vector3Int> containerOccupiedCells = new List<Vector3Int>();
+                            foreach (var cell in occupiedCells)
+                            {
+                                Vector3 cellWorldPos = referenceGrid.GetCellCenterWorld(gridPosition + cell);
+                                Vector3Int containerCell = container.Grid.WorldToCell(cellWorldPos);
+                                containerOccupiedCells.Add(containerCell);
+                            }
+                            
+                            // Check if any of these cells contain the island
+                            foreach (var pos in containerOccupiedCells)
+                            {
+                                // Check by ID first
+                                if (container.GridData.GetObjectIDAt(pos) == islandObjectID)
+                                {
+                                    return true;
+                                }
+                                // Also check if cell is occupied (in case island was added differently)
+                                if (container.GridData.HasObjectAt(pos))
+                                {
+                                    // Double-check it's the island by checking if it's not a regular object
+                                    int id = container.GridData.GetObjectIDAt(pos);
+                                    if (id == islandObjectID || id < 0) // Negative IDs are special objects
+                                    {
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            return false;
         }
     }
 

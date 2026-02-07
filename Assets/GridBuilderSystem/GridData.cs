@@ -125,10 +125,26 @@ namespace GridBuilder.Core
 
         internal void RemoveObjectAt(Vector3Int gridPosition)
         {
-            foreach (var pos in placedObjects[gridPosition].occupiedPositions)
+            if (!placedObjects.ContainsKey(gridPosition))
+                return;
+            
+            PlacementData data = placedObjects[gridPosition];
+            foreach (var pos in data.occupiedPositions)
             {
                 placedObjects.Remove(pos);
             }
+        }
+        
+        /// <summary>
+        /// Removes an object at a specific position if it exists (safe version)
+        /// </summary>
+        public bool TryRemoveObjectAt(Vector3Int gridPosition)
+        {
+            if (!placedObjects.ContainsKey(gridPosition))
+                return false;
+            
+            RemoveObjectAt(gridPosition);
+            return true;
         }
 
         /// <summary>
@@ -285,6 +301,27 @@ namespace GridBuilder.Core
             }
             
             return result;
+        }
+        
+        /// <summary>
+        /// Gets all grid cells occupied by an object with the given placed object index
+        /// </summary>
+        public List<Vector3Int> GetCellsForObjectIndex(int placedObjectIndex)
+        {
+            List<Vector3Int> cells = new List<Vector3Int>();
+            HashSet<int> seenIndices = new HashSet<int>();
+            
+            foreach (var kvp in placedObjects)
+            {
+                PlacementData data = kvp.Value;
+                if (data.PlacedObjectIndex == placedObjectIndex && !seenIndices.Contains(data.PlacedObjectIndex))
+                {
+                    seenIndices.Add(data.PlacedObjectIndex);
+                    cells.AddRange(data.occupiedPositions);
+                }
+            }
+            
+            return cells;
         }
     }
 

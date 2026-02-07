@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f08eccf2ba25e4c438858aa61f869bc8, type: 3}
+  m_Name: Level_0
+  m_EditorClassIdentifier: Assembly-CSharp::GridBuilder.Core.LevelData
+  levelName: Straight Shot
+  par: 1
+  gridCellSize: 1
+  gridSize: {x: 10, y: 10}
+  splineBoundaryPoints:
+  - {x: -5, y: -5}
+  - {x: 5, y: -5}
+  - {x: 5, y: 5}
+  - {x: -5, y: 5}
+  playerSpawnCell: {x: -1, y: 0, z: -3}
+  goalCell: {x: -1, y: 0, z: 3}
+  gridMaterial: {fileID: 2100000, guid: 29f5a41931bdf4fa0852fa968e1fd614, type: 2}
+  placementLayerMask:
+    serializedVersion: 2
+    m_Bits: 64
+  ringPrefab: {fileID: 1869539175963192084, guid: af63b5fbdd8c3e749a6d4f39b210ff3b, type: 3}
+  autoCreateRing: 1
+  hazards: []
+  rockPrefab: {fileID: 0}
+  sandtrapPrefab: {fileID: 0}
+  whirlpoolPrefab: {fileID: 0}
+  currentPrefab: {fileID: 0}

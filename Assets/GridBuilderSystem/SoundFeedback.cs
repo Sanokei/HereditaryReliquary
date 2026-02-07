@@ -14,22 +14,31 @@ namespace GridBuilder.Core
 
         public void PlaySound(SoundType soundType)
         {
+            if (audioSource == null)
+                return;
+            
+            AudioClip clipToPlay = null;
             switch (soundType)
             {
                 case SoundType.Click:
-                    audioSource.PlayOneShot(clickSound);
+                    clipToPlay = clickSound;
                     break;
                 case SoundType.Place:
-                    audioSource.PlayOneShot(placeSound);
+                    clipToPlay = placeSound;
                     break;
                 case SoundType.Remove:
-                    audioSource.PlayOneShot(removeSound);
+                    clipToPlay = removeSound;
                     break;
                 case SoundType.WrongPlacement:
-                    audioSource.PlayOneShot(wrongPlacementSound);
+                    clipToPlay = wrongPlacementSound;
                     break;
                 default:
                     break;
+            }
+            
+            if (clipToPlay != null)
+            {
+                audioSource.PlayOneShot(clipToPlay);
             }
         }
     }
